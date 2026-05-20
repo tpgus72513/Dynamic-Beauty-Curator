@@ -1,0 +1,7 @@
+# 올리브영 크롤러에 필요한 라이브러리
+# 설치: pip install -r requirements.txt
+
+selenium==4.25.0              # 브라우저 자동 조종 ("사람의 손")
+beautifulsoup4==4.12.3        # HTML에서 데이터 추출 ("형광펜")
+pandas==2.2.3                 # 수집 데이터를 CSV로 저장
+webdriver-manager==4.0.2      # 크롬 드라이버 자동 설치/관리

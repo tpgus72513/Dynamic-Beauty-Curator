@@ -1,0 +1,8 @@
+# 백엔드 서버에 필요한 라이브러리
+# 설치: pip install -r requirements.txt
+
+fastapi==0.115.0          # API 서버 프레임워크
+uvicorn==0.30.6           # FastAPI를 실행하는 웹 서버
+pydantic==2.9.2           # 요청/응답 데이터 검증
+requests==2.32.3          # 외부 API(기상청·에어코리아) 호출용
+python-dotenv==1.0.1      # .env 파일에서 API 키 읽기
