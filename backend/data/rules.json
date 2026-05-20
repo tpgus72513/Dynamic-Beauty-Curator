@@ -30,7 +30,7 @@
         "고농도 AHA",
         "알코올 토너"
       ],
-      "review_evidence": "리뷰 분석 데이터 기반 (상세 근거 없음)"
+      "review_evidence": "미세먼지 관련 리뷰 2건 중  동반 등장"
     },
     "dry_sensitive_보통_보통": {
       "rule_id": "dry_sens_pm25n_uvn",
@@ -54,7 +54,7 @@
       "avoid": [
         "딥클렌징 폼"
       ],
-      "review_evidence": "리뷰 분석 데이터 기반 (상세 근거 없음)"
+      "review_evidence": "건조 관련 리뷰 268건 중 시카(11회), 판테놀(8회), 히알루론(7회) 동반 등장"
     },
     "oily_나쁨_매우높음": {
       "rule_id": "oily_pm25b_uvvh",
@@ -84,7 +84,7 @@
         "무거운 크림",
         "오일 세럼"
       ],
-      "review_evidence": "리뷰 분석 데이터 기반 (상세 근거 없음)"
+      "review_evidence": "미세먼지 관련 리뷰 2건 중  동반 등장"
     },
     "combination_나쁨_낮음": {
       "rule_id": "comb_pm25b_uvl",
@@ -106,7 +106,7 @@
         }
       ],
       "avoid": [],
-      "review_evidence": "리뷰 분석 데이터 기반 (상세 근거 없음)"
+      "review_evidence": "미세먼지 관련 리뷰 2건 중  동반 등장"
     }
   },
   "default": {
