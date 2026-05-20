@@ -99,6 +99,15 @@ REGION_TO_SIDO = {
     "유성구": "대전", "서구": "대전",
 }
 
+SIDO_TO_STN = {
+    "서울": 108,
+    "부산": 159,
+    "세종": 90,
+    "인천": 112,
+    "대전": 133,
+    "경기": 119,
+}
+
 
 def _region_to_sido(region: str) -> str:
     """
@@ -163,32 +172,29 @@ def get_pm25(region: str) -> int:
 # 3. 자외선 지수 (기상청 자외선 관측 API)
 # ------------------------------------------------------------
 def get_uv(region: str) -> int:
-    """
-    자외선 지수를 가져온다.
+    sido = REGION_TO_SIDO.get(region, "서울")
+    stn  = SIDO_TO_STN.get(sido, 108)
 
-    기상청 자외선 API는 응답 형식이 단순 텍스트인 경우가 많아
-    파싱 로직을 백엔드 담당이 명세에 맞춰 조정해야 한다.
-    여기서는 호출 골격만 제공한다.
-    """
     url = "https://apihub.kma.go.kr/api/typ01/url/kma_sfctm_uv.php"
     params = {
         "authKey": settings.KMA_UV_API_KEY,
-        # ⚠️ 실제 파라미터(지점번호 등)는 기상청 명세 확인 후 추가
+        "stn": stn,
+        "help": 0,
     }
 
     res = requests.get(url, params=params, timeout=settings.API_TIMEOUT)
     res.raise_for_status()
 
-    # 기상청 응답은 텍스트일 수 있으므로, 실제 파싱은 명세에 맞춰 구현
-    # 지금은 골격이므로 파싱 실패 시 예외를 던져 fallback으로 넘어가게 함
-    text = res.text
-    if not text or "error" in text.lower():
-        raise ValueError("자외선 데이터 파싱 실패")
+    data_lines = [
+        line for line in res.text.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
 
-    # TODO: 백엔드 담당 — 실제 응답 형식에 맞춰 자외선 지수 추출
-    raise NotImplementedError("기상청 자외선 응답 파싱 로직을 명세에 맞춰 구현하세요")
+    if not data_lines:
+        raise ValueError("자외선 데이터 없음")
 
-
+    values = data_lines[-1].split()
+    return int(round(float(values[5])))
 # ------------------------------------------------------------
 # 4. 수질 (현재는 공개 실시간 API가 제한적 → 시드/정적 데이터 사용)
 # ------------------------------------------------------------
