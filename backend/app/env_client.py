@@ -76,22 +76,75 @@ def get_region(lat: float, lng: float) -> str:
 # ------------------------------------------------------------
 # 2. 미세먼지 농도 (에어코리아 대기오염정보 API)
 # ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# 행정동 → 시도 변환 테이블
+# 카카오 API가 돌려주는 행정동 이름을 에어코리아 sidoName으로 변환한다
+# 데모에서 다루는 지역 위주로 작성 — 필요하면 추가
+# ------------------------------------------------------------
+REGION_TO_SIDO = {
+    # 세종
+    "조치원읍": "세종", "한솔동": "세종", "도담동": "세종",
+    "아름동": "세종", "종촌동": "세종", "고운동": "세종",
+    # 서울
+    "강남구": "서울", "중구": "서울", "종로구": "서울",
+    "마포구": "서울", "서초구": "서울", "송파구": "서울",
+    "강동구": "서울", "관악구": "서울", "영등포구": "서울",
+    # 경기
+    "수원시": "경기", "성남시": "경기", "용인시": "경기",
+    # 부산
+    "부산진구": "부산", "해운대구": "부산", "동구": "부산",
+    # 인천
+    "미추홀구": "인천", "연수구": "인천",
+    # 대전
+    "유성구": "대전", "서구": "대전",
+}
+
+
+def _region_to_sido(region: str) -> str:
+    """
+    행정동 이름으로 시도 이름을 찾는다.
+    테이블에 없으면 "세종"을 기본값으로 반환한다.
+    """
+    if region in REGION_TO_SIDO:
+        return REGION_TO_SIDO[region]
+
+    # 테이블에 없는 경우: 행정동 이름 자체가 시도인 경우도 있으므로
+    # 에어코리아가 인식하는 시도 목록과 비교해본다
+    VALID_SIDOS = ["서울", "부산", "대구", "인천", "광주", "대전",
+                   "울산", "경기", "강원", "충북", "충남", "전북",
+                   "전남", "경북", "경남", "제주", "세종"]
+    if region in VALID_SIDOS:
+        return region
+
+    # 그래도 없으면 기본값
+    print(f"[env_client] '{region}' 시도 매핑 없음 → 세종으로 fallback")
+    return "세종"
+
+
+# ------------------------------------------------------------
+# 2. 미세먼지 농도 (에어코리아 대기오염정보 API)
+# ------------------------------------------------------------
 def get_pm25(region: str) -> int:
     """
     행정동(또는 시도) 기준 초미세먼지 농도를 가져온다.
-
-    실제로는 [측정소정보 API로 가까운 측정소를 찾고]
-    → [그 측정소의 실시간 농도를 조회] 하는 2단계지만,
-    여기서는 시도 단위 조회로 단순화한 골격을 제공한다.
-    백엔드 담당이 측정소 매핑 로직을 추가해야 한다.
+    region → 시도 변환 후 에어코리아 API 호출.
     """
+    sido = _region_to_sido(region)  # ← 여기서 동적으로 변환
+    print(f"[env_client] get_pm25: region={region} → sido={sido}")
+
+>>>>>>> sehyun
     url = "http://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty"
     params = {
         "serviceKey": settings.AIRKOREA_API_KEY,
         "returnType": "json",
         "numOfRows": 100,
         "pageNo": 1,
+<<<<<<< HEAD
         "sidoName": "세종",  # ⚠️ region에서 시도를 추출하도록 수정 필요
+=======
+        "sidoName": sido,  # ← 하드코딩 "세종" 대신 동적 값
+>>>>>>> sehyun
         "ver": "1.0",
     }
 
@@ -101,6 +154,7 @@ def get_pm25(region: str) -> int:
     data = res.json()
     items = data.get("response", {}).get("body", {}).get("items", [])
     if not items:
+<<<<<<< HEAD
         raise ValueError("미세먼지 데이터 없음")
 
     # 첫 번째 측정소의 pm25 값 사용 (실제로는 가장 가까운 측정소를 골라야 함)
@@ -109,6 +163,17 @@ def get_pm25(region: str) -> int:
         raise ValueError("미세먼지 측정값이 비어있음")
 
     return int(float(pm25_raw))
+=======
+        raise ValueError(f"미세먼지 데이터 없음: {sido}")
+
+    # pm25Value가 있는 첫 번째 측정소 사용
+    for item in items:
+        pm25_raw = item.get("pm25Value", "-")
+        if pm25_raw not in ("-", "", None):
+            return int(float(pm25_raw))
+
+    raise ValueError(f"유효한 pm25 측정값 없음: {sido}")
+>>>>>>> sehyun
 
 
 # ------------------------------------------------------------
