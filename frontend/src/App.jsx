@@ -65,19 +65,24 @@ function App() {
 
   // env: mock으로 시작 → 백엔드 /recommend 응답 오면 실제 데이터로 교체
   const [env, setEnv] = useState(() => buildEnv(tweaks.envPreset));
-  const [recommend, setRecommend] = useState(null); // /recommend 응답 전체 (recommendations, avoid, message …)
+  const [recommend, setRecommend] = useState(null);
+  const [recStatus, setRecStatus] = useState('loading'); // 'loading' | 'ok' | 'error'
   useEffect(() => {
     getRecommend({ lat: 36.62, lng: 127.29, skin_type: skinProfile.type })
       .then(res => {
         console.log('[recommend] env_data:', res.env_data);
         setEnv(adaptEnvData(res.env_data));
-        setRecommend(res);                              // ← 추가
+        setRecommend(res);
+        setRecStatus('ok');
       })
-      .catch(err => console.error('[recommend] 실패:', err));
+      .catch(err => {
+        console.error('[recommend] 실패:', err);
+        setRecStatus('error');
+      });
   }, [skinProfile.type]);
 
   const ctx = {
-    permissions, skinProfile, lastAnalysis, env, recommend,   // ← recommend 추가
+    permissions, skinProfile, lastAnalysis, env, recommend, recStatus,   // ← recStatus 추가
     set: (patch) => {
       if ('permissions' in patch) setPermissions(patch.permissions);
       if ('skinProfile' in patch) setSkinProfile(patch.skinProfile);

@@ -364,8 +364,22 @@ function ScreenHome({ ctx, nav }) {
               <IconSparkle size={14}/>
             </div>
             <div style={{ flex: 1, fontSize: 13, color: 'var(--ink)', lineHeight: 1.55, letterSpacing: '-0.015em' }}>
-              오늘 우리 동네는 <strong>미세먼지가 많아요</strong>.<br/>
-              <span style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>진정·장벽 케어</span>를 추천드려요.
+              {ctx.recStatus === 'loading' && '오늘의 추천을 불러오는 중…'}
+              {ctx.recStatus === 'error' && '추천을 불러오지 못해 예시 데이터로 보여드려요.'}
+              {ctx.recStatus === 'ok' && (
+                <>
+                  {ctx.recommend?.is_fallback && (
+                    <span style={{
+                      display: 'inline-block', marginBottom: 6,
+                      padding: '2px 8px', borderRadius: 9999,
+                      background: '#fff', border: '1px solid var(--accent-soft)',
+                      fontSize: 10, fontWeight: 700, color: 'var(--accent-ink)',
+                      fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
+                    }}>데모 데이터</span>
+                  )}
+                  <div>{ctx.recommend?.message || '오늘의 추천을 확인해보세요.'}</div>
+                </>
+              )}
             </div>
           </div>
 
