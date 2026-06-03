@@ -6,6 +6,8 @@ import { IOSStatusBar } from './ios-frame';
 import { ENV_DATA } from './data';
 import { ScreenOnboarding, ScreenSkinSetup, ScreenHome, ScreenCamera } from './screens-1-4';
 import { ScreenAnalyzing, ScreenResult, ScreenRecommendations, ScreenHistory, ScreenMyPage } from './screens-5-9';
+import { getRecommend } from './api/client';
+import { adaptEnvData } from './api/adapters';
 
 // ─── Defaults ─────────────────────────────────────────────
 const TWEAK_DEFAULTS = {
@@ -60,7 +62,17 @@ function App() {
     concerns: ['redness', 'dry'],
   });
   const [lastAnalysis, setLastAnalysis] = useState(null);
-  const env = useMemo(() => buildEnv(tweaks.envPreset), [tweaks.envPreset]);
+
+  // env: mock으로 시작 → 백엔드 /recommend 응답 오면 실제 데이터로 교체
+  const [env, setEnv] = useState(() => buildEnv(tweaks.envPreset));
+  useEffect(() => {
+    getRecommend({ lat: 36.62, lng: 127.29, skin_type: skinProfile.type })
+      .then(res => {
+        console.log('[recommend] env_data:', res.env_data);
+        setEnv(adaptEnvData(res.env_data));
+      })
+      .catch(err => console.error('[recommend] 실패:', err));
+  }, [skinProfile.type]);
 
   const ctx = {
     permissions, skinProfile, lastAnalysis, env,

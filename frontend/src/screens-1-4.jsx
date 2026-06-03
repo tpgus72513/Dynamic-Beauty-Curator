@@ -55,9 +55,7 @@ function ScreenOnboarding({ ctx, nav }) {
             </p>
           </div>
           <div style={{ flex: 1, minHeight: 80 }} />
-          <div style={{ padding: '0 28px 12px' }}>
-            <Placeholder height={220} radius={20} label="hero visual" hue={150}/>
-          </div>
+          
         </div>
         <BottomCTA>
           <Button onClick={() => setStep(1)} variant="primary" size="xl" fullWidth iconRight={<IconArrowR size={18}/>}>
