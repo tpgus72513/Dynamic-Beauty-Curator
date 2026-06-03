@@ -1,4 +1,3 @@
-/* eslint-disable */
 // src/icons.jsx — inline SVG icon set
 // Stroke-based 1.6 width, 24px viewBox. Sized via prop.
 

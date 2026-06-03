@@ -1,4 +1,3 @@
-/* eslint-disable */
 // src/data.jsx — mock data for demo
 // Realistic Korean placeholder content for K-beauty curator demo
 
