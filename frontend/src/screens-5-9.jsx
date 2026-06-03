@@ -15,9 +15,9 @@ import {
 // ═══════════════════════════════════════════════════════════
 function ScreenAnalyzing({ ctx, nav }) {
   const steps = [
-    { id: 0, label: '얼굴 분석 중…', sub: 'AI 모델로 피부 상태 추출', icon: <IconFace size={20}/> },
-    { id: 1, label: '환경 데이터 결합 중…', sub: '미세먼지·자외선·수질 호출', icon: <IconLeaf size={20}/> },
-    { id: 2, label: '맞춤 제품 찾는 중…', sub: '룰북 + 리뷰 NLP 매칭', icon: <IconSparkle size={20}/> },
+    { id: 0, label: '얼굴 분석 중…', sub: 'AI 모델로 피부 상태 추출', icon: <IconFace size={20} /> },
+    { id: 1, label: '환경 데이터 결합 중…', sub: '미세먼지·자외선·수질 호출', icon: <IconLeaf size={20} /> },
+    { id: 2, label: '맞춤 제품 찾는 중…', sub: '룰북 + 리뷰 NLP 매칭', icon: <IconSparkle size={20} /> },
   ];
   const [active, setActive] = React.useState(0);
   const [progress, setProgress] = React.useState(0);
@@ -49,7 +49,7 @@ function ScreenAnalyzing({ ctx, nav }) {
     <div className="screen anim-fade" style={{
       background: 'linear-gradient(180deg, var(--accent-tint) 0%, var(--bg) 50%, var(--bg) 100%)',
     }}>
-      <div style={{ paddingTop: 60 }}/>
+      <div style={{ paddingTop: 60 }} />
       <div className="screen-body" style={{ display: 'flex', flexDirection: 'column', padding: '20px 24px' }}>
         {/* breathing orb */}
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
@@ -58,19 +58,19 @@ function ScreenAnalyzing({ ctx, nav }) {
               position: 'absolute', inset: 0, borderRadius: 9999,
               background: 'radial-gradient(circle, var(--accent-soft) 0%, transparent 70%)',
               animation: 'breathe 2.4s ease-in-out infinite',
-            }}/>
+            }} />
             <div style={{
               position: 'absolute', inset: 30, borderRadius: 9999,
               background: 'radial-gradient(circle, var(--accent-strong) 0%, var(--accent-ink) 100%)',
               animation: 'breathe 2.4s ease-in-out infinite 0.3s',
-            }}/>
+            }} />
             <svg width="200" height="200" style={{ position: 'absolute', inset: 0, animation: 'spin 14s linear infinite' }}>
               <circle cx="100" cy="100" r="92" fill="none" stroke="var(--accent-strong)" strokeWidth="2"
-                strokeDasharray="4 12" opacity="0.5"/>
+                strokeDasharray="4 12" opacity="0.5" />
             </svg>
             <svg width="200" height="200" style={{ position: 'absolute', inset: 0, animation: 'spin 22s linear infinite reverse' }}>
               <circle cx="100" cy="100" r="76" fill="none" stroke="var(--accent-strong)" strokeWidth="1.5"
-                strokeDasharray="2 8" opacity="0.3"/>
+                strokeDasharray="2 8" opacity="0.3" />
             </svg>
           </div>
         </div>
@@ -80,7 +80,7 @@ function ScreenAnalyzing({ ctx, nav }) {
             DYNAMIC CURATION
           </div>
           <h1 className="h-display" style={{ marginTop: 10, fontSize: 24 }}>
-            오늘의 케어를<br/>찾고 있어요
+            오늘의 케어를<br />찾고 있어요
           </h1>
         </div>
 
@@ -92,13 +92,13 @@ function ScreenAnalyzing({ ctx, nav }) {
               background: 'var(--accent-strong)',
               borderRadius: 9999,
               transition: 'width 100ms linear',
-            }}/>
+            }} />
           </div>
           <div style={{
             display: 'flex', justifyContent: 'space-between', marginTop: 8,
             fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)',
           }}>
-            <span>{String(Math.floor(progress)).padStart(3,'0')}%</span>
+            <span>{String(Math.floor(progress)).padStart(3, '0')}%</span>
             <span>예상 시간 3초</span>
           </div>
         </div>
@@ -125,19 +125,19 @@ function ScreenAnalyzing({ ctx, nav }) {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0,
                 }}>
-                  {state === 'done' ? <IconCheck size={16} sw={2.5}/> : s.icon}
+                  {state === 'done' ? <IconCheck size={16} sw={2.5} /> : s.icon}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{s.label}</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>{s.sub}</div>
                 </div>
-                {state === 'active' && <LoadingDots/>}
+                {state === 'active' && <LoadingDots />}
               </div>
             );
           })}
         </div>
 
-        <div style={{ flex: 1, minHeight: 16 }}/>
+        <div style={{ flex: 1, minHeight: 16 }} />
         <div style={{ textAlign: 'center', padding: '20px 0 10px' }}>
           <div className="t-small">조치원읍 환경 데이터 · 30분 캐시</div>
         </div>
@@ -153,7 +153,7 @@ function LoadingDots() {
         <div key={i} style={{
           width: 5, height: 5, borderRadius: 9999, background: 'var(--accent-strong)',
           animation: `pulseDot 1.2s ease-in-out infinite ${d}s`,
-        }}/>
+        }} />
       ))}
     </div>
   );
@@ -165,6 +165,7 @@ function LoadingDots() {
 function ScreenResult({ ctx, nav }) {
   const analysis = ctx.lastAnalysis || SKIN_ANALYSIS;
   const env = ctx.env;
+  const message = ctx.recommend?.message || analysis.message;   // 백엔드 메시지 우선, 없으면 mock  
 
   return (
     <div className="screen anim-slide-r">
@@ -182,7 +183,7 @@ function ScreenResult({ ctx, nav }) {
           gap: 20,
           border: '1px solid var(--accent-soft)',
         }}>
-          <ScoreRing value={analysis.overall} size={92} stroke={9} label="SKIN SCORE"/>
+          <ScoreRing value={analysis.overall} size={92} stroke={9} label="SKIN SCORE" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="t-tiny" style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-ink)', letterSpacing: '0.05em' }}>
               감지된 상태
@@ -203,9 +204,9 @@ function ScreenResult({ ctx, nav }) {
         <div style={{ padding: '16px 20px 0' }}>
           <Card padding={16} style={{ background: 'var(--bg-sunken)' }}>
             <div style={{ display: 'flex', gap: 10 }}>
-              <IconSparkle size={18} stroke="var(--accent-strong)"/>
+              <IconSparkle size={18} stroke="var(--accent-strong)" />
               <div style={{ flex: 1, fontSize: 13, color: 'var(--ink)', lineHeight: 1.55 }}>
-                {analysis.message}
+                {message}
               </div>
             </div>
           </Card>
@@ -213,26 +214,26 @@ function ScreenResult({ ctx, nav }) {
 
         {/* factor breakdown */}
         <div style={{ padding: '24px 20px 0' }}>
-          <SectionHead title="피부 지표" sub="6개 항목" style={{ padding: 0, marginBottom: 12 }}/>
+          <SectionHead title="피부 지표" sub="6개 항목" style={{ padding: 0, marginBottom: 12 }} />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {analysis.factors.map(f => <FactorCard key={f.id} f={f}/>)}
+            {analysis.factors.map(f => <FactorCard key={f.id} f={f} />)}
           </div>
         </div>
 
         {/* env summary inline */}
         <div style={{ padding: '24px 20px 0' }}>
-          <SectionHead title="오늘의 환경" sub={env.fullRegion} style={{ padding: 0, marginBottom: 12 }}/>
+          <SectionHead title="오늘의 환경" sub={env.fullRegion} style={{ padding: 0, marginBottom: 12 }} />
           <Card padding={0}>
-            <EnvRow icon={<IconDust size={16}/>} label="미세먼지 (PM2.5)" value={`${env.pm25.value} ${env.pm25.unit}`} hint={env.pm25.label} level={env.pm25.level}/>
-            <EnvRow icon={<IconSun size={16}/>} label="자외선 지수" value={env.uv.value} hint={env.uv.label} level={env.uv.level}/>
-            <EnvRow icon={<IconDrop size={16}/>} label="수질" value={env.water.label} hint="노후관 영향 지역" level={env.water.level}/>
-            <EnvRow icon={<IconTemp size={16}/>} label="기온·습도" value={`${env.temp.value}°C · ${env.humidity.value}%`} hint="실외 활동 보통" level="mid" last/>
+            <EnvRow icon={<IconDust size={16} />} label="미세먼지 (PM2.5)" value={`${env.pm25.value} ${env.pm25.unit}`} hint={env.pm25.label} level={env.pm25.level} />
+            <EnvRow icon={<IconSun size={16} />} label="자외선 지수" value={env.uv.value} hint={env.uv.label} level={env.uv.level} />
+            <EnvRow icon={<IconDrop size={16} />} label="수질" value={env.water.label} hint="노후관 영향 지역" level={env.water.level} />
+            <EnvRow icon={<IconTemp size={16} />} label="기온·습도" value={`${env.temp.value}°C · ${env.humidity.value}%`} hint="실외 활동 보통" level="mid" last />
           </Card>
         </div>
 
         {/* avoid panel */}
         <div style={{ padding: '24px 20px 0' }}>
-          <SectionHead title="오늘 피해야 할 성분" style={{ padding: 0, marginBottom: 12 }}/>
+          <SectionHead title="오늘 피해야 할 성분" style={{ padding: 0, marginBottom: 12 }} />
           <Card padding={14}>
             {AVOID_INGREDIENTS.map((a, i) => (
               <div key={a.name} style={{
@@ -245,7 +246,7 @@ function ScreenResult({ ctx, nav }) {
                   width: 22, height: 22, borderRadius: 9999, flexShrink: 0,
                   background: 'oklch(0.96 0.04 25)', color: 'var(--status-vbad)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}><IconClose size={12} sw={2.5}/></div>
+                }}><IconClose size={12} sw={2.5} /></div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{a.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{a.reason}</div>
@@ -255,10 +256,10 @@ function ScreenResult({ ctx, nav }) {
           </Card>
         </div>
 
-        <div style={{ height: 100 }}/>
+        <div style={{ height: 100 }} />
       </div>
       <BottomCTA>
-        <Button onClick={() => nav.go('recommendations')} variant="primary" size="xl" fullWidth iconRight={<IconArrowR size={18}/>}>
+        <Button onClick={() => nav.go('recommendations')} variant="primary" size="xl" fullWidth iconRight={<IconArrowR size={18} />}>
           맞춤 제품 보기
         </Button>
       </BottomCTA>
@@ -270,8 +271,8 @@ function FactorCard({ f }) {
   const levelColor = {
     good: 'oklch(0.55 0.10 150)',
     high: 'oklch(0.55 0.10 150)',
-    mid:  'oklch(0.55 0.10 85)',
-    low:  'oklch(0.55 0.14 30)',
+    mid: 'oklch(0.55 0.10 85)',
+    low: 'oklch(0.55 0.14 30)',
   }[f.level];
   return (
     <Card padding={14}>
@@ -291,7 +292,7 @@ function FactorCard({ f }) {
         <div style={{
           height: '100%', width: `${f.score}%`, background: levelColor,
           borderRadius: 9999, transition: 'width 800ms cubic-bezier(0.22,1,0.36,1)',
-        }}/>
+        }} />
       </div>
     </Card>
   );
@@ -300,8 +301,8 @@ function FactorCard({ f }) {
 function EnvRow({ icon, label, value, hint, level, last }) {
   const levelColors = {
     good: 'oklch(0.55 0.10 150)',
-    mid:  'oklch(0.55 0.10 85)',
-    bad:  'oklch(0.55 0.13 45)',
+    mid: 'oklch(0.55 0.10 85)',
+    bad: 'oklch(0.55 0.13 45)',
     vbad: 'oklch(0.55 0.16 25)',
   };
   return (
@@ -332,25 +333,30 @@ function ScreenRecommendations({ ctx, nav }) {
   const [selected, setSelected] = React.useState(null);
   const [category, setCategory] = React.useState('all');
 
+  const recs = ctx.recommend?.recommendations || [];   // 백엔드 추천 루틴 [{step, category, ingredient}]
   const cats = ['all', ...Array.from(new Set(PRODUCTS.map(p => p.category)))];
 
   const sorted = React.useMemo(() => {
+    // 추천 성분과 겹치는 제품에 가산점 → 매칭순 상단으로 (성분명 부분일치 비교)
+    const recScore = (p) => recs.filter(r =>
+      p.ingredients.some(ing => ing.includes(r.ingredient) || r.ingredient.includes(ing))
+    ).length;
     let list = [...PRODUCTS];
     if (category !== 'all') list = list.filter(p => p.category === category);
-    if (sort === 'match') list.sort((a, b) => b.match - a.match);
+    if (sort === 'match') list.sort((a, b) => (recScore(b) - recScore(a)) || (b.match - a.match));
     if (sort === 'rating') list.sort((a, b) => b.rating - a.rating);
     if (sort === 'price') list.sort((a, b) => a.price - b.price);
     return list;
-  }, [sort, category]);
+  }, [sort, category, ctx.recommend]);
 
   return (
     <div className="screen anim-slide-r">
       <NavTop onBack={() => nav.go('result')} title="오늘의 추천" sub={`${SKIN_TYPES.find(t => t.id === ctx.skinProfile?.type)?.label || '건성·민감'} · ${ctx.env.region}`}
         right={
           <button style={{ width: 40, height: 40, background: 'transparent', border: 'none', color: 'var(--ink)' }}>
-            <IconHeart size={20}/>
+            <IconHeart size={20} />
           </button>
-        }/>
+        } />
 
       <div className="screen-body">
         {/* curation banner */}
@@ -362,25 +368,46 @@ function ScreenRecommendations({ ctx, nav }) {
             display: 'flex', alignItems: 'center', gap: 10,
             fontSize: 12, color: 'var(--ink-2)',
           }}>
-            <IconSparkle size={16} stroke="var(--accent-strong)"/>
+            <IconSparkle size={16} stroke="var(--accent-strong)" />
             <span style={{ flex: 1 }}>
               <strong style={{ color: 'var(--ink)' }}>리뷰 11,224건</strong> + 룰북 매칭으로 큐레이션
             </span>
             <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }}>{PRODUCTS.length}</span>
           </div>
         </div>
-
+        {/* 백엔드 추천 루틴 */}
+        {recs.length > 0 && (
+          <div style={{ padding: '12px 20px 0' }}>
+            <Card padding={14}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-2)', marginBottom: 10 }}>오늘의 추천 루틴</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {recs.map(r => (
+                  <div key={r.step} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 9999, flexShrink: 0,
+                      background: 'var(--accent-strong)', color: '#fff',
+                      fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>{r.step}</div>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{r.category}</span>
+                    <span style={{ fontSize: 12, color: 'var(--accent-ink)' }}>· {r.ingredient}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        )}
         {/* filters */}
         <div style={{ padding: '14px 20px 0' }}>
           <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}>
             {[
-              { id: 'match',  label: '매칭순' },
+              { id: 'match', label: '매칭순' },
               { id: 'rating', label: '평점순' },
-              { id: 'price',  label: '낮은가격순' },
+              { id: 'price', label: '낮은가격순' },
             ].map(s => (
               <Chip key={s.id} size="sm" selected={sort === s.id} onClick={() => setSort(s.id)}>{s.label}</Chip>
             ))}
-            <div style={{ width: 1, background: 'var(--line)', margin: '4px 4px' }}/>
+            <div style={{ width: 1, background: 'var(--line)', margin: '4px 4px' }} />
             {cats.map(c => (
               <Chip key={c} size="sm" selected={category === c} onClick={() => setCategory(c)}>
                 {c === 'all' ? '전체' : c}
@@ -391,13 +418,13 @@ function ScreenRecommendations({ ctx, nav }) {
 
         {/* product list */}
         <div style={{ padding: '14px 20px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {sorted.map(p => <ProductCard key={p.id} p={p} onClick={() => setSelected(p)}/>)}
+          {sorted.map(p => <ProductCard key={p.id} p={p} onClick={() => setSelected(p)} />)}
         </div>
 
-        <div style={{ height: 28 }}/>
+        <div style={{ height: 28 }} />
       </div>
 
-      {selected && <ProductSheet p={selected} onClose={() => setSelected(null)}/>}
+      {selected && <ProductSheet p={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
@@ -406,7 +433,7 @@ function ProductCard({ p, onClick }) {
   return (
     <Card onClick={onClick} padding={12} style={{ display: 'flex', gap: 12 }}>
       <div style={{ position: 'relative' }}>
-        <Placeholder width={92} height={92} radius={12} label="product" hue={p.category === '진정·보습' ? 150 : p.category === '선케어' ? 85 : p.category === '클렌징' ? 220 : 30}/>
+        <Placeholder width={92} height={92} radius={12} label="product" hue={p.category === '진정·보습' ? 150 : p.category === '선케어' ? 85 : p.category === '클렌징' ? 220 : 30} />
         {p.tag && (
           <div style={{
             position: 'absolute', top: 6, left: 6,
@@ -423,14 +450,16 @@ function ProductCard({ p, onClick }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', letterSpacing: '0.05em', fontFamily: 'var(--font-mono)' }}>{p.brand}</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', marginTop: 2, lineHeight: 1.3,
+            <div style={{
+              fontSize: 14, fontWeight: 600, color: 'var(--ink)', marginTop: 2, lineHeight: 1.3,
               overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box',
-              WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{p.name}</div>
+              WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'
+            }}>{p.name}</div>
           </div>
-          <MatchBadge value={p.match}/>
+          <MatchBadge value={p.match} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-          <StarRow value={p.rating} count={p.reviewCount} small/>
+          <StarRow value={p.rating} count={p.reviewCount} small />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 6 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
@@ -483,19 +512,19 @@ function ProductSheet({ p, onClose }) {
         animation: 'slideInRight 280ms cubic-bezier(0.22,1,0.36,1)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
-          <div style={{ width: 36, height: 4, borderRadius: 9999, background: 'var(--line-2)' }}/>
+          <div style={{ width: 36, height: 4, borderRadius: 9999, background: 'var(--line-2)' }} />
         </div>
         <div style={{ padding: '4px 20px 24px' }}>
           <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-            <Placeholder width={120} height={120} radius={14} label="product" hue={p.category === '진정·보습' ? 150 : 30}/>
+            <Placeholder width={120} height={120} radius={14} label="product" hue={p.category === '진정·보습' ? 150 : 30} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', letterSpacing: '0.05em', fontFamily: 'var(--font-mono)' }}>{p.brand}</div>
               <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)', marginTop: 4, letterSpacing: '-0.02em', lineHeight: 1.25 }}>{p.name}</div>
-              <div style={{ marginTop: 8 }}><StarRow value={p.rating} count={p.reviewCount}/></div>
+              <div style={{ marginTop: 8 }}><StarRow value={p.rating} count={p.reviewCount} /></div>
               <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 {p.originalPrice && (
                   <span style={{ fontSize: 13, color: 'var(--warm)', fontWeight: 700 }}>
-                    {Math.round((1 - p.price/p.originalPrice) * 100)}%
+                    {Math.round((1 - p.price / p.originalPrice) * 100)}%
                   </span>
                 )}
                 <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>
@@ -521,7 +550,7 @@ function ProductSheet({ p, onClose }) {
                   <div style={{
                     width: 16, height: 16, borderRadius: 9999, background: 'var(--accent-strong)', color: '#fff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}><IconCheck size={10} sw={3}/></div>
+                  }}><IconCheck size={10} sw={3} /></div>
                   <span style={{ fontSize: 13, color: 'var(--ink)' }}>{w}</span>
                 </div>
               ))}
@@ -557,7 +586,7 @@ function ProductSheet({ p, onClose }) {
 
           <div style={{ marginTop: 24, display: 'flex', gap: 8 }}>
             <Button onClick={onClose} variant="outline" size="lg" style={{ flex: 1 }}>닫기</Button>
-            <Button variant="primary" size="lg" style={{ flex: 2 }} iconRight={<IconArrowR size={16}/>}>
+            <Button variant="primary" size="lg" style={{ flex: 2 }} iconRight={<IconArrowR size={16} />}>
               상세 보기
             </Button>
           </div>
@@ -573,7 +602,7 @@ function ProductSheet({ p, onClose }) {
 function ScreenHistory({ ctx, nav }) {
   return (
     <div className="screen anim-slide-r">
-      <NavTop onBack={() => nav.go('home')} title="분석 히스토리"/>
+      <NavTop onBack={() => nav.go('home')} title="분석 히스토리" />
       <div className="screen-body">
         {/* trend chart */}
         <div style={{ padding: '4px 20px 0' }}>
@@ -589,7 +618,7 @@ function ScreenHistory({ ctx, nav }) {
               </div>
             </div>
             <div style={{ marginTop: 14 }}>
-              <TrendChart data={TREND_OVERALL} height={100} color="var(--accent-strong)"/>
+              <TrendChart data={TREND_OVERALL} height={100} color="var(--accent-strong)" />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
               {['7일전', '6일전', '5일전', '4일전', '3일전', '어제', '오늘'].map((d, i) => (
@@ -608,7 +637,7 @@ function ScreenHistory({ ctx, nav }) {
               <span style={{ fontSize: 11, color: 'var(--status-vbad)', fontFamily: 'var(--font-mono)' }}>-4</span>
             </div>
             <div style={{ marginTop: 8 }}>
-              <TrendChart data={TREND_HYDRATION} height={32} color="oklch(0.65 0.10 220)" mini/>
+              <TrendChart data={TREND_HYDRATION} height={32} color="oklch(0.65 0.10 220)" mini />
             </div>
           </Card>
           <Card padding={14}>
@@ -623,12 +652,12 @@ function ScreenHistory({ ctx, nav }) {
 
         {/* timeline */}
         <div style={{ padding: '24px 20px 0' }}>
-          <SectionHead title="전체 기록" sub={`${HISTORY.length}건`} style={{ padding: 0, marginBottom: 12 }}/>
+          <SectionHead title="전체 기록" sub={`${HISTORY.length}건`} style={{ padding: 0, marginBottom: 12 }} />
           <div style={{ position: 'relative', paddingLeft: 18 }}>
             <div style={{
               position: 'absolute', left: 5, top: 6, bottom: 6,
               width: 1, background: 'var(--line-2)',
-            }}/>
+            }} />
             {HISTORY.map((h, i) => (
               <div key={h.date} style={{ position: 'relative', paddingBottom: 14 }}>
                 <div style={{
@@ -637,7 +666,7 @@ function ScreenHistory({ ctx, nav }) {
                   background: i === 0 ? 'var(--accent-strong)' : '#fff',
                   border: i === 0 ? '2px solid #fff' : '2px solid var(--line-2)',
                   boxShadow: i === 0 ? '0 0 0 2px var(--accent-strong)' : 'none',
-                }}/>
+                }} />
                 <Card padding={14}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
@@ -653,16 +682,16 @@ function ScreenHistory({ ctx, nav }) {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-                    <MiniStat icon={<IconDust size={11}/>} value={`PM ${h.pm25}`}/>
-                    <MiniStat icon={<IconSun size={11}/>} value={`UVI ${h.uv}`}/>
-                    <MiniStat icon={<IconSparkle size={11}/>} value={h.top}/>
+                    <MiniStat icon={<IconDust size={11} />} value={`PM ${h.pm25}`} />
+                    <MiniStat icon={<IconSun size={11} />} value={`UVI ${h.uv}`} />
+                    <MiniStat icon={<IconSparkle size={11} />} value={h.top} />
                   </div>
                 </Card>
               </div>
             ))}
           </div>
         </div>
-        <div style={{ height: 24 }}/>
+        <div style={{ height: 24 }} />
       </div>
     </div>
   );
@@ -693,21 +722,21 @@ function TrendChart({ data, height = 80, color, mini }) {
   });
   const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ');
   const areaPath = `${path} L ${w} ${height} L 0 ${height} Z`;
-  const id = React.useMemo(() => `g-${Math.random().toString(36).slice(2,8)}`, []);
+  const id = React.useMemo(() => `g-${Math.random().toString(36).slice(2, 8)}`, []);
   return (
     <svg width="100%" height={height} viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none">
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.18"/>
-          <stop offset="100%" stopColor={color} stopOpacity="0"/>
+          <stop offset="0%" stopColor={color} stopOpacity="0.18" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={areaPath} fill={`url(#${id})`}/>
-      <path d={path} fill="none" stroke={color} strokeWidth={mini ? 1.6 : 2} strokeLinecap="round" strokeLinejoin="round"/>
+      <path d={areaPath} fill={`url(#${id})`} />
+      <path d={path} fill="none" stroke={color} strokeWidth={mini ? 1.6 : 2} strokeLinecap="round" strokeLinejoin="round" />
       {!mini && pts.map(([x, y], i) => (
         <circle key={i} cx={x} cy={y} r={i === pts.length - 1 ? 4 : 2.5}
           fill={i === pts.length - 1 ? color : '#fff'}
-          stroke={color} strokeWidth="1.5"/>
+          stroke={color} strokeWidth="1.5" />
       ))}
     </svg>
   );
@@ -724,7 +753,7 @@ function ScreenMyPage({ ctx, nav }) {
 
   return (
     <div className="screen anim-slide-r">
-      <NavTop onBack={() => nav.go('home')} title="마이 페이지"/>
+      <NavTop onBack={() => nav.go('home')} title="마이 페이지" />
       <div className="screen-body" style={{ paddingBottom: 30 }}>
         {/* profile header */}
         <div style={{ padding: '8px 20px 0' }}>
@@ -746,28 +775,28 @@ function ScreenMyPage({ ctx, nav }) {
                 width: 36, height: 36, borderRadius: 9999, background: 'var(--bg-sunken)',
                 border: 'none', color: 'var(--ink-2)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}><IconEdit size={16}/></button>
+              }}><IconEdit size={16} /></button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 16 }}>
-              <ProfileStat label="총 분석" value="42회"/>
-              <ProfileStat label="평균 점수" value="74"/>
-              <ProfileStat label="저장 제품" value="18"/>
+              <ProfileStat label="총 분석" value="42회" />
+              <ProfileStat label="평균 점수" value="74" />
+              <ProfileStat label="저장 제품" value="18" />
             </div>
           </Card>
         </div>
 
         {/* profile detail list */}
-        <SectionHead title="프로필" style={{ padding: '24px 20px 12px', margin: 0 }}/>
+        <SectionHead title="프로필" style={{ padding: '24px 20px 12px', margin: 0 }} />
         <div style={{ padding: '0 20px' }}>
           <Card padding={0}>
-            <SettingRow icon={<IconFace size={16}/>} label="피부 타입" value={skinLabel} onClick={() => nav.go('skin-setup')}/>
-            <SettingRow icon={<IconSparkle size={16}/>} label="관심 고민" value={`${ctx.skinProfile?.concerns?.length || 0}개`} onClick={() => nav.go('skin-setup')}/>
-            <SettingRow icon={<IconLocation size={16}/>} label="기본 위치" value={ctx.env.fullRegion} onClick={() => {}} last/>
+            <SettingRow icon={<IconFace size={16} />} label="피부 타입" value={skinLabel} onClick={() => nav.go('skin-setup')} />
+            <SettingRow icon={<IconSparkle size={16} />} label="관심 고민" value={`${ctx.skinProfile?.concerns?.length || 0}개`} onClick={() => nav.go('skin-setup')} />
+            <SettingRow icon={<IconLocation size={16} />} label="기본 위치" value={ctx.env.fullRegion} onClick={() => { }} last />
           </Card>
         </div>
 
         {/* notification settings */}
-        <SectionHead title="알림 설정" sub="환경 변화에 따른 맞춤 알림" style={{ padding: '24px 20px 12px', margin: 0 }}/>
+        <SectionHead title="알림 설정" sub="환경 변화에 따른 맞춤 알림" style={{ padding: '24px 20px 12px', margin: 0 }} />
         <div style={{ padding: '0 20px' }}>
           <Card padding={0}>
             {notifs.map((n, i) => (
@@ -780,19 +809,19 @@ function ScreenMyPage({ ctx, nav }) {
                   <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{n.label}</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3, lineHeight: 1.4 }}>{n.desc}</div>
                 </div>
-                <Toggle value={n.value} onChange={v => setNotif(n.id, v)}/>
+                <Toggle value={n.value} onChange={v => setNotif(n.id, v)} />
               </div>
             ))}
           </Card>
         </div>
 
         {/* account */}
-        <SectionHead title="계정" style={{ padding: '24px 20px 12px', margin: 0 }}/>
+        <SectionHead title="계정" style={{ padding: '24px 20px 12px', margin: 0 }} />
         <div style={{ padding: '0 20px' }}>
           <Card padding={0}>
-            <SettingRow icon={<IconShield size={16}/>} label="개인정보 및 데이터" onClick={() => {}}/>
-            <SettingRow icon={<IconInfo size={16}/>} label="버전 정보" value="0.4.1 · beta" chev={false}/>
-            <SettingRow icon={<IconClose size={16}/>} label="로그아웃" onClick={() => {}} danger last/>
+            <SettingRow icon={<IconShield size={16} />} label="개인정보 및 데이터" onClick={() => { }} />
+            <SettingRow icon={<IconInfo size={16} />} label="버전 정보" value="0.4.1 · beta" chev={false} />
+            <SettingRow icon={<IconClose size={16} />} label="로그아웃" onClick={() => { }} danger last />
           </Card>
         </div>
       </div>
@@ -829,7 +858,7 @@ function SettingRow({ icon, label, value, onClick, chev = true, last, danger }) 
       }}>{icon}</div>
       <div style={{ flex: 1, fontSize: 14, color: danger ? 'var(--status-vbad)' : 'var(--ink)', fontWeight: 500 }}>{label}</div>
       {value && <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>{value}</div>}
-      {chev && onClick && <IconChevR size={16} stroke="var(--ink-4)"/>}
+      {chev && onClick && <IconChevR size={16} stroke="var(--ink-4)" />}
     </button>
   );
 }
