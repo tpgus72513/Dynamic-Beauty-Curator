@@ -1,0 +1,21 @@
+/* tokens.css에서 디자인 토큰 import */
+@import './tokens.css';
+
+/* 글로벌 리셋 */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Pretendard Variable', 'Inter', -apple-system, sans-serif;
+  background: var(--bg, #fafafa);
+  color: var(--text, #111);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
