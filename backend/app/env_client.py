@@ -133,18 +133,17 @@ def get_pm25(region: str) -> int:
     sido = _region_to_sido(region)  # ← 여기서 동적으로 변환
     print(f"[env_client] get_pm25: region={region} → sido={sido}")
 
->>>>>>> sehyun
+
     url = "http://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty"
     params = {
         "serviceKey": settings.AIRKOREA_API_KEY,
         "returnType": "json",
         "numOfRows": 100,
         "pageNo": 1,
-<<<<<<< HEAD
-        "sidoName": "세종",  # ⚠️ region에서 시도를 추출하도록 수정 필요
-=======
+
+
         "sidoName": sido,  # ← 하드코딩 "세종" 대신 동적 값
->>>>>>> sehyun
+
         "ver": "1.0",
     }
 
@@ -154,16 +153,7 @@ def get_pm25(region: str) -> int:
     data = res.json()
     items = data.get("response", {}).get("body", {}).get("items", [])
     if not items:
-<<<<<<< HEAD
-        raise ValueError("미세먼지 데이터 없음")
 
-    # 첫 번째 측정소의 pm25 값 사용 (실제로는 가장 가까운 측정소를 골라야 함)
-    pm25_raw = items[0].get("pm25Value", "-")
-    if pm25_raw in ("-", "", None):
-        raise ValueError("미세먼지 측정값이 비어있음")
-
-    return int(float(pm25_raw))
-=======
         raise ValueError(f"미세먼지 데이터 없음: {sido}")
 
     # pm25Value가 있는 첫 번째 측정소 사용
@@ -173,7 +163,7 @@ def get_pm25(region: str) -> int:
             return int(float(pm25_raw))
 
     raise ValueError(f"유효한 pm25 측정값 없음: {sido}")
->>>>>>> sehyun
+
 
 
 # ------------------------------------------------------------
