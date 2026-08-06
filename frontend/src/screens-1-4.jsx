@@ -9,6 +9,13 @@ import {
 } from './icons';
 import { SKIN_TYPES, CONCERNS } from './data';
 import { KoreaMap, MapLegend, LAYERS, KOREA_REGIONS } from './korea-map';
+import {
+  cameraErrorMessage,
+  captureVideoFrame,
+  requestUserCamera,
+  stopMediaStream,
+  validateSelectedImage,
+} from './camera';
 
 // ═══════════════════════════════════════════════════════════
 // 1. ONBOARDING + PERMISSIONS
@@ -18,9 +25,12 @@ function ScreenOnboarding({ ctx, nav }) {
   const [perms, setPerms] = React.useState(ctx.permissions);
 
   const grant = async (key) => {
-    const granted = key === 'location' && ctx.requestLocation
-      ? await ctx.requestLocation()
-      : true;
+    let granted = true;
+    if (key === 'location' && ctx.requestLocation) {
+      granted = await ctx.requestLocation();
+    } else if (key === 'camera' && ctx.requestCameraPermission) {
+      granted = await ctx.requestCameraPermission();
+    }
     const next = { ...perms, [key]: granted };
     setPerms(next);
     ctx.set({ permissions: next });
@@ -80,7 +90,7 @@ function ScreenOnboarding({ ctx, nav }) {
         bullets: ['행정동 단위 환경 데이터', '저장하지 않고 추천에만 사용', '언제든지 끌 수 있어요'] }
     : { key: 'camera', icon: <IconCamera size={36}/>, title: '카메라 접근 허용',
         body: '얼굴 사진으로 오늘의 피부 상태를 분석합니다.',
-        bullets: ['수분·민감도·트러블 분석', '이미지는 기기에서만 처리', '분석 후 즉시 폐기'] };
+        bullets: ['5개 피부 위험도 분석', '백엔드 메모리에서만 처리', '즉시 폐기 · 의료 진단 아님'] };
 
   return (
     <div className="screen anim-fade">
@@ -468,21 +478,97 @@ function SecondaryButton({ icon, label, desc, onClick }) {
 // 4. CAMERA — face capture
 // ═══════════════════════════════════════════════════════════
 function ScreenCamera({ ctx, nav }) {
+  const videoRef = React.useRef(null);
+  const streamRef = React.useRef(null);
+  const fileRef = React.useRef(null);
+  const mountedRef = React.useRef(false);
+  const submittingRef = React.useRef(false);
   const [capturing, setCapturing] = React.useState(false);
+  const [cameraStatus, setCameraStatus] = React.useState('opening');
+  const [cameraError, setCameraError] = React.useState('');
 
-  const onCapture = () => {
+  const openCamera = React.useCallback(async () => {
+    stopMediaStream(streamRef.current);
+    streamRef.current = null;
+    setCameraStatus('opening');
+    setCameraError('');
+    try {
+      const stream = await requestUserCamera();
+      if (!mountedRef.current || submittingRef.current) {
+        stopMediaStream(stream);
+        return;
+      }
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setCameraStatus('ready');
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setCameraStatus('error');
+      setCameraError(cameraErrorMessage(error));
+    }
+  }, []);
+
+  React.useEffect(() => {
+    mountedRef.current = true;
+    openCamera();
+    return () => {
+      mountedRef.current = false;
+      stopMediaStream(streamRef.current);
+      streamRef.current = null;
+    };
+  }, [openCamera]);
+
+  const submitImage = React.useCallback((image) => {
+    submittingRef.current = true;
+    stopMediaStream(streamRef.current);
+    streamRef.current = null;
+    if (ctx.startAnalysis) {
+      ctx.startAnalysis(image);
+    } else {
+      submittingRef.current = false;
+      setCameraError('분석 기능을 시작하지 못했습니다. 다시 시도해 주세요.');
+      setCameraStatus('error');
+    }
+  }, [ctx]);
+
+  const capture = async () => {
     setCapturing(true);
-    // TODO: send captured image to face analysis model
-    setTimeout(() => nav.go('analyzing'), 300);
+    setCameraError('');
+    try {
+      const image = await captureVideoFrame(videoRef.current);
+      submitImage(image);
+    } catch (error) {
+      setCameraError(error.message);
+      setCameraStatus('error');
+    } finally {
+      setCapturing(false);
+    }
+  };
+
+  const chooseFile = (event) => {
+    try {
+      submitImage(validateSelectedImage(event.target.files?.[0]));
+    } catch (error) {
+      setCameraError(error.message);
+      setCameraStatus('error');
+      event.target.value = '';
+    }
+  };
+
+  const closeCamera = () => {
+    submittingRef.current = true;
+    stopMediaStream(streamRef.current);
+    streamRef.current = null;
+    nav.go('home');
   };
 
   return (
-    <div className="screen anim-slide-r" style={{ background: '#0a0908' }}>
-      {/* fake camera feed */}
+    <div className="screen camera-screen anim-slide-r" style={{ background: '#0a0908' }}>
       <div style={{
         position: 'absolute', inset: 0,
         background: 'radial-gradient(ellipse at 50% 40%, oklch(0.45 0.012 30) 0%, oklch(0.18 0.005 30) 70%, oklch(0.08 0 0) 100%)',
       }}/>
+      <video ref={videoRef} className="camera-preview" playsInline muted autoPlay />
 
       {/* top bar */}
       <div style={{
@@ -490,7 +576,7 @@ function ScreenCamera({ ctx, nav }) {
         display: 'flex', justifyContent: 'space-between',
         padding: 'max(16px, env(safe-area-inset-top)) 16px 0',
       }}>
-        <button onClick={() => nav.go('home')} style={{
+        <button type="button" aria-label="카메라 닫기" onClick={closeCamera} style={{
           width: 40, height: 40, borderRadius: 9999, background: 'rgba(0,0,0,0.5)',
           border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
           backdropFilter: 'blur(10px)',
@@ -504,9 +590,9 @@ function ScreenCamera({ ctx, nav }) {
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
           <span style={{ width: 6, height: 6, borderRadius: 9999, background: 'oklch(0.7 0.18 30)', animation: 'breathe 1.5s ease-in-out infinite' }}/>
-          얼굴 인식 중
+          {cameraStatus === 'ready' ? '카메라 준비 완료' : cameraStatus === 'opening' ? '카메라 여는 중' : '확인 필요'}
         </div>
-        <button style={{
+        <button type="button" aria-label="카메라 다시 시도" onClick={openCamera} style={{
           width: 40, height: 40, borderRadius: 9999, background: 'rgba(0,0,0,0.5)',
           border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
           backdropFilter: 'blur(10px)',
@@ -519,6 +605,14 @@ function ScreenCamera({ ctx, nav }) {
       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
         <FaceOval/>
       </div>
+
+      {cameraError && (
+        <div className="camera-error" role="alert">
+          <strong>카메라를 확인해 주세요</strong>
+          <span>{cameraError}</span>
+          <button type="button" onClick={openCamera}>다시 시도</button>
+        </div>
+      )}
 
       {/* bottom hint + capture */}
       <div style={{
@@ -544,8 +638,12 @@ function ScreenCamera({ ctx, nav }) {
           </div>
         </div>
 
+        <p className="camera-privacy">
+          사진은 분석을 위해 백엔드로 전송되며 메모리에서만 처리 후 즉시 폐기됩니다. 의료 진단이 아닙니다.
+        </p>
+
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 36 }}>
-          <button style={{
+          <button type="button" aria-label="사진 선택" onClick={() => fileRef.current?.click()} style={{
             width: 52, height: 52, borderRadius: 9999, background: 'rgba(255,255,255,0.12)',
             backdropFilter: 'blur(10px)',
             border: 'none', color: '#fff',
@@ -553,14 +651,27 @@ function ScreenCamera({ ctx, nav }) {
           }}>
             <IconHistory size={20}/>
           </button>
+          <input
+            ref={fileRef}
+            type="file"
+            hidden
+            aria-label="사진 파일 선택"
+            accept="image/jpeg,image/png,image/webp"
+            capture="user"
+            onChange={chooseFile}
+          />
           <button
-            onClick={onCapture}
+            type="button"
+            aria-label="얼굴 사진 촬영"
+            onClick={capture}
+            disabled={cameraStatus !== 'ready' || capturing}
             style={{
               width: 78, height: 78, borderRadius: 9999,
               background: 'transparent',
               border: '3px solid #fff',
               padding: 4,
-              cursor: 'pointer',
+              cursor: cameraStatus === 'ready' ? 'pointer' : 'not-allowed',
+              opacity: cameraStatus === 'ready' ? 1 : 0.5,
             }}>
             <div style={{
               width: '100%', height: '100%', borderRadius: 9999,
@@ -569,7 +680,7 @@ function ScreenCamera({ ctx, nav }) {
               transition: 'transform 220ms',
             }}/>
           </button>
-          <button style={{
+          <button type="button" aria-label="촬영 안내" style={{
             width: 52, height: 52, borderRadius: 9999, background: 'rgba(255,255,255,0.12)',
             backdropFilter: 'blur(10px)',
             border: 'none', color: '#fff',

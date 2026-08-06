@@ -192,6 +192,52 @@ select:focus-visible {
 .login-hint { color: var(--ink-3); }
 .login-error { color: var(--status-vbad); font-weight: 600; }
 
+/* Live camera: mirror only the preview, never captured pixel data. */
+.camera-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  background: #0a0908;
+}
+.camera-error {
+  position: absolute;
+  z-index: 4;
+  top: max(86px, calc(env(safe-area-inset-top) + 62px));
+  left: 20px;
+  right: 20px;
+  display: grid;
+  gap: 5px;
+  padding: 14px 15px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 16px;
+  background: rgba(14, 12, 11, .76);
+  color: #fff;
+  backdrop-filter: blur(16px);
+}
+.camera-error strong { font-size: 13px; }
+.camera-error span { color: rgba(255,255,255,.72); font-size: 11px; line-height: 1.45; }
+.camera-error button {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255,255,255,.24);
+  border-radius: 999px;
+  background: rgba(255,255,255,.1);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.camera-privacy {
+  margin: -15px 4px 18px;
+  color: rgba(255,255,255,.58);
+  font-size: 10px;
+  line-height: 1.45;
+  text-align: center;
+}
+
 /* App surface — no simulated phone hardware frame */
 .app-shell {
   min-height: 100vh;

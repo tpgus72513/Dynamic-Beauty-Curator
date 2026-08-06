@@ -8,6 +8,7 @@ import { ScreenAnalyzing, ScreenResult, ScreenRecommendations, ScreenHistory, Sc
 import { getRecommend } from './api/client';
 import { adaptEnvData } from './api/adapters';
 import { clearNickname, readNickname, saveNickname } from './profile';
+import { requestUserCamera, stopMediaStream } from './camera';
 
 // ─── Defaults ─────────────────────────────────────────────
 const TWEAK_DEFAULTS = {
@@ -126,6 +127,18 @@ function App() {
     );
   }), []);
 
+  const requestCameraPermission = useCallback(async () => {
+    try {
+      const stream = await requestUserCamera();
+      stopMediaStream(stream);
+      setPermissions(current => ({ ...current, camera: true }));
+      return true;
+    } catch {
+      setPermissions(current => ({ ...current, camera: false }));
+      return false;
+    }
+  }, []);
+
   const refreshRecommendation = useCallback(async ({
     skinType = skinProfile.type,
     coords = location,
@@ -188,6 +201,7 @@ function App() {
     location,
     locationStatus,
     requestLocation,
+    requestCameraPermission,
     refreshRecommendation,
     set: (patch) => {
       if ('permissions' in patch) setPermissions(patch.permissions);
