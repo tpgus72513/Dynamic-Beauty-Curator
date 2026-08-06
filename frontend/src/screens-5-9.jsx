@@ -7,9 +7,10 @@ import {
   IconHeart, IconInfo, IconLeaf, IconLocation, IconShield, IconSparkle, IconSun, IconTemp,
 } from './icons';
 import {
-  SKIN_ANALYSIS, AVOID_INGREDIENTS, PRODUCTS, SKIN_TYPES,
+  PRODUCTS, SKIN_TYPES,
   HISTORY, TREND_OVERALL, TREND_HYDRATION, NOTIF_DEFAULTS,
 } from './data';
+import { rankProducts } from './recommendation-ranking';
 // ═══════════════════════════════════════════════════════════
 // 5. ANALYZING — loading w/ steps
 // ═══════════════════════════════════════════════════════════
@@ -156,31 +157,53 @@ function LoadingDots() {
 // 6. RESULT — skin + env summary
 // ═══════════════════════════════════════════════════════════
 function ScreenResult({ ctx, nav }) {
-  const analysis = ctx.lastAnalysis || SKIN_ANALYSIS;
+  const analysis = ctx.lastAnalysis;
   const env = ctx.env;
-  const message = ctx.recommend?.message || analysis.message;   // 백엔드 메시지 우선, 없으면 mock  
-
-  if (analysis?.mainRisk) {
+  if (!analysis?.mainRisk) {
     return (
       <div className="screen anim-slide-r">
         <NavTop onBack={() => nav.go('home')} title="분석 결과" />
-        <div className="screen-body" style={{ padding: 20 }}>
-          <Card>
-            <div className="t-tiny">실제 모델 분석 완료</div>
-            <div className="h-title" style={{ marginTop: 8 }}>{analysis.mainRisk.label_ko}</div>
-            <div className="t-body" style={{ marginTop: 6 }}>위험 확률 {analysis.mainRisk.risk_score}%</div>
+        <div className="screen-body" style={{ padding: '44px 20px 120px' }}>
+          <Card padding={24} style={{ textAlign: 'center', background: 'var(--accent-tint)' }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: 18, margin: '0 auto',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--accent-ink)', background: 'var(--bg-elev)',
+            }}><IconFace size={26} /></div>
+            <div className="h-sub" style={{ marginTop: 18 }}>아직 분석 결과가 없어요</div>
+            <p className="t-body" style={{ color: 'var(--ink-3)', margin: '8px 0 0' }}>
+              얼굴 사진을 촬영하면 다섯 가지 피부 위험도를 확인할 수 있어요.
+            </p>
           </Card>
         </div>
+        <BottomCTA>
+          <Button onClick={() => nav.go('camera')} variant="primary" size="xl" fullWidth>
+            피부 분석 시작
+          </Button>
+        </BottomCTA>
       </div>
     );
   }
 
+  const focusRisks = (analysis.focusRisks || []).filter(Boolean).slice(0, 2);
+  const factors = (analysis.factors || []).filter(Boolean).slice(0, 5);
+  const message = ctx.recommend?.message
+    || `${focusRisks.map(risk => risk.label_ko).join('와 ')} 위험도를 중심으로 관리해 보세요.`;
+  const avoid = ctx.recommend?.avoid || [];
+  const signals = ctx.recommend?.ranking_signals || [];
+  const analyzedDate = new Date(analysis.analyzedAt);
+  const analyzedAt = Number.isNaN(analyzedDate.getTime())
+    ? '방금 분석'
+    : new Intl.DateTimeFormat('ko-KR', {
+      month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    }).format(analyzedDate);
+
   return (
     <div className="screen anim-slide-r">
-      <NavTop onBack={() => nav.go('home')} title="분석 결과" sub="2026.05.20 · 07:34" />
+      <NavTop onBack={() => nav.go('home')} title="분석 결과" sub={analyzedAt} />
       <div className="screen-body">
 
-        {/* skin overall ring */}
+        {/* highest-risk summary */}
         <div style={{
           margin: '8px 20px 0',
           padding: '24px 20px',
@@ -191,20 +214,23 @@ function ScreenResult({ ctx, nav }) {
           gap: 20,
           border: '1px solid var(--accent-soft)',
         }}>
-          <ScoreRing value={analysis.overall} size={92} stroke={9} label="SKIN SCORE" />
+          <ScoreRing value={analysis.mainRisk.risk_score} size={92} stroke={9} label="RISK" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="t-tiny" style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-ink)', letterSpacing: '0.05em' }}>
-              감지된 상태
+              가장 먼저 볼 위험도
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-              {analysis.detected.map(d => (
-                <span key={d} style={{
-                  padding: '4px 10px', borderRadius: 9999,
-                  background: '#fff', border: '1px solid var(--accent-soft)',
-                  fontSize: 12, color: 'var(--accent-ink)', fontWeight: 600,
-                }}>{d}</span>
+            <div className="h-title" style={{ marginTop: 4 }}>{analysis.mainRisk.label_ko}</div>
+            <ul aria-label="우선 관리 위험도" style={{
+              display: 'flex', flexWrap: 'wrap', gap: 5, margin: '8px 0 0', padding: 0, listStyle: 'none',
+            }}>
+              {focusRisks.map(risk => (
+                <li key={risk.id} style={{
+                  padding: '4px 9px', borderRadius: 9999,
+                  background: 'var(--bg-elev)', border: '1px solid var(--accent-soft)',
+                  fontSize: 11, color: 'var(--accent-ink)', fontWeight: 700,
+                }}>{risk.label_ko} {risk.risk_score}</li>
               ))}
-            </div>
+            </ul>
           </div>
         </div>
 
@@ -222,14 +248,17 @@ function ScreenResult({ ctx, nav }) {
 
         {/* factor breakdown */}
         <div style={{ padding: '24px 20px 0' }}>
-          <SectionHead title="피부 지표" sub="6개 항목" style={{ padding: 0, marginBottom: 12 }} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {analysis.factors.map(f => <FactorCard key={f.id} f={f} />)}
-          </div>
+          <SectionHead title="5가지 피부 위험도" sub="높을수록 관리가 더 필요해요" style={{ padding: 0, marginBottom: 12 }} />
+          <ul aria-label="5가지 피부 위험도" style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
+            listStyle: 'none', padding: 0, margin: 0,
+          }}>
+            {factors.map(f => <FactorCard key={f.id} f={f} />)}
+          </ul>
         </div>
 
         {/* env summary inline */}
-        <div style={{ padding: '24px 20px 0' }}>
+        {env && <div style={{ padding: '24px 20px 0' }}>
           <SectionHead title="오늘의 환경" sub={env.fullRegion} style={{ padding: 0, marginBottom: 12 }} />
           <Card padding={0}>
             <EnvRow icon={<IconDust size={16} />} label="미세먼지 (PM2.5)" value={`${env.pm25.value} ${env.pm25.unit}`} hint={env.pm25.label} level={env.pm25.level} />
@@ -237,18 +266,20 @@ function ScreenResult({ ctx, nav }) {
             <EnvRow icon={<IconDrop size={16} />} label="수질" value={env.water.label} hint="노후관 영향 지역" level={env.water.level} />
             <EnvRow icon={<IconTemp size={16} />} label="기온·습도" value={`${env.temp.value}°C · ${env.humidity.value}%`} hint="실외 활동 보통" level="mid" last />
           </Card>
-        </div>
+        </div>}
 
         {/* avoid panel */}
-        <div style={{ padding: '24px 20px 0' }}>
+        {avoid.length > 0 && <div style={{ padding: '24px 20px 0' }}>
           <SectionHead title="오늘 피해야 할 성분" style={{ padding: 0, marginBottom: 12 }} />
           <Card padding={14}>
-            {AVOID_INGREDIENTS.map((a, i) => (
-              <div key={a.name} style={{
+            {avoid.map((name, i) => {
+              const reason = signals.find(signal => signal.kind === 'avoid' && signal.value === name)?.reason;
+              return (
+              <div key={name} style={{
                 display: 'flex', gap: 10, alignItems: 'flex-start',
                 paddingTop: i === 0 ? 0 : 12,
-                paddingBottom: i === AVOID_INGREDIENTS.length - 1 ? 0 : 12,
-                borderBottom: i === AVOID_INGREDIENTS.length - 1 ? 'none' : '1px solid var(--line)',
+                paddingBottom: i === avoid.length - 1 ? 0 : 12,
+                borderBottom: i === avoid.length - 1 ? 'none' : '1px solid var(--line)',
               }}>
                 <div style={{
                   width: 22, height: 22, borderRadius: 9999, flexShrink: 0,
@@ -256,12 +287,21 @@ function ScreenResult({ ctx, nav }) {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}><IconClose size={12} sw={2.5} /></div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{a.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{a.reason}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                    {reason || '오늘의 피부·환경 상태를 고려해 제외해요.'}
+                  </div>
                 </div>
               </div>
-            ))}
+            )})}
           </Card>
+        </div>}
+
+        <div style={{ padding: '18px 20px 0', display: 'flex', gap: 8, alignItems: 'flex-start', color: 'var(--ink-3)' }}>
+          <IconShield size={15} />
+          <p style={{ fontSize: 11, lineHeight: 1.5, margin: 0 }}>
+            이 결과는 의료 진단이 아닌 화장품 추천용 AI 분석입니다.
+          </p>
         </div>
 
         <div style={{ height: 100 }} />
@@ -276,33 +316,31 @@ function ScreenResult({ ctx, nav }) {
 }
 
 function FactorCard({ f }) {
-  const levelColor = {
-    good: 'oklch(0.55 0.10 150)',
-    high: 'oklch(0.55 0.10 150)',
-    mid: 'oklch(0.55 0.10 85)',
-    low: 'oklch(0.55 0.14 30)',
-  }[f.level];
+  const isHigh = f.risk_label === 'high';
+  const levelColor = isHigh ? 'var(--status-vbad)' : 'oklch(0.55 0.10 150)';
+  const score = Math.max(0, Math.min(100, Number(f.risk_score || 0)));
   return (
-    <Card padding={14}>
+    <li style={{ listStyle: 'none' }} aria-label={`${f.label_ko} 위험 확률 ${score}%`}>
+    <Card padding={14} style={{ height: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 500 }}>{f.label}</div>
-        {f.delta !== 0 && (
-          <div style={{ fontSize: 10, color: f.delta > 0 ? levelColor : 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-            {f.delta > 0 ? '+' : ''}{f.delta}
-          </div>
-        )}
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 600 }}>{f.label_ko}</div>
+        <div style={{
+          fontSize: 9, fontWeight: 700, color: levelColor,
+          padding: '2px 6px', borderRadius: 9999, background: 'var(--bg-sunken)',
+        }}>{isHigh ? '우선 관리' : '낮음'}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 6 }}>
-        <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.03em', lineHeight: 1 }}>{f.score}</span>
+        <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.03em', lineHeight: 1 }}>{score}</span>
         <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>/100</span>
       </div>
       <div style={{ marginTop: 10, height: 4, background: 'var(--line)', borderRadius: 9999, overflow: 'hidden' }}>
         <div style={{
-          height: '100%', width: `${f.score}%`, background: levelColor,
+          height: '100%', width: `${score}%`, background: levelColor,
           borderRadius: 9999, transition: 'width 800ms cubic-bezier(0.22,1,0.36,1)',
         }} />
       </div>
     </Card>
+    </li>
   );
 }
 
@@ -342,20 +380,16 @@ function ScreenRecommendations({ ctx, nav }) {
   const [category, setCategory] = React.useState('all');
 
   const recs = ctx.recommend?.recommendations || [];   // 백엔드 추천 루틴 [{step, category, ingredient}]
+  const signals = ctx.recommend?.ranking_signals || [];
   const cats = ['all', ...Array.from(new Set(PRODUCTS.map(p => p.category)))];
 
   const sorted = React.useMemo(() => {
-    // 추천 성분과 겹치는 제품에 가산점 → 매칭순 상단으로 (성분명 부분일치 비교)
-    const recScore = (p) => recs.filter(r =>
-      p.ingredients.some(ing => ing.includes(r.ingredient) || r.ingredient.includes(ing))
-    ).length;
-    let list = [...PRODUCTS];
+    let list = rankProducts(PRODUCTS, signals);
     if (category !== 'all') list = list.filter(p => p.category === category);
-    if (sort === 'match') list.sort((a, b) => (recScore(b) - recScore(a)) || (b.match - a.match));
     if (sort === 'rating') list.sort((a, b) => b.rating - a.rating);
     if (sort === 'price') list.sort((a, b) => a.price - b.price);
     return list;
-  }, [sort, category, ctx.recommend]);
+  }, [sort, category, signals]);
 
   return (
     <div className="screen anim-slide-r">
@@ -378,7 +412,7 @@ function ScreenRecommendations({ ctx, nav }) {
           }}>
             <IconSparkle size={16} stroke="var(--accent-strong)" />
             <span style={{ flex: 1 }}>
-              <strong style={{ color: 'var(--ink)' }}>리뷰 11,224건</strong> + 룰북 매칭으로 큐레이션
+              <strong style={{ color: 'var(--ink)' }}>실제 피부 위험도</strong> + 환경·성분 매칭으로 정렬
             </span>
             <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }}>{PRODUCTS.length}</span>
           </div>
@@ -425,9 +459,16 @@ function ScreenRecommendations({ ctx, nav }) {
         </div>
 
         {/* product list */}
-        <div style={{ padding: '14px 20px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {sorted.map(p => <ProductCard key={p.id} p={p} onClick={() => setSelected(p)} />)}
-        </div>
+        <ol aria-label="맞춤 추천 제품" style={{
+          padding: '14px 20px 0', margin: 0, display: 'flex',
+          flexDirection: 'column', gap: 12, listStyle: 'none',
+        }}>
+          {sorted.map(p => (
+            <li key={p.id} style={{ listStyle: 'none' }}>
+              <ProductCard p={p} onClick={() => setSelected(p)} />
+            </li>
+          ))}
+        </ol>
 
         <div style={{ height: 28 }} />
       </div>
@@ -464,7 +505,7 @@ function ProductCard({ p, onClick }) {
               WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'
             }}>{p.name}</div>
           </div>
-          <MatchBadge value={p.match} />
+          <MatchBadge value={p.personalizedMatch ?? p.match} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
           <StarRow value={p.rating} count={p.reviewCount} small />
@@ -480,7 +521,11 @@ function ProductCard({ p, onClick }) {
               {p.price.toLocaleString()}원
             </span>
           </div>
-          <span style={{ fontSize: 10, color: 'var(--accent-ink)', fontWeight: 600 }}>{p.why[0]}</span>
+          <span style={{ fontSize: 10, color: 'var(--accent-ink)', fontWeight: 600, textAlign: 'right' }}>
+            {p.personalizedReason
+              ? `${p.personalizedReason.reason} · ${p.personalizedReason.label} 매칭`
+              : p.why[0]}
+          </span>
         </div>
       </div>
     </Card>
@@ -504,6 +549,9 @@ function MatchBadge({ value }) {
 }
 
 function ProductSheet({ p, onClose }) {
+  const reasons = p.personalizedReason
+    ? [`${p.personalizedReason.reason} · ${p.personalizedReason.label} 매칭`, ...p.why]
+    : p.why;
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 50,
@@ -549,11 +597,11 @@ function ProductSheet({ p, onClose }) {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-ink)', letterSpacing: '0.05em', fontFamily: 'var(--font-mono)' }}>
-                MATCH {p.match}%
+                MATCH {p.personalizedMatch ?? p.match}%
               </div>
             </div>
             <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {p.why.map((w, i) => (
+              {reasons.map((w, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <div style={{
                     width: 16, height: 16, borderRadius: 9999, background: 'var(--accent-strong)', color: '#fff',

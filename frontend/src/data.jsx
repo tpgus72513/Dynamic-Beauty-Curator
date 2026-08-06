@@ -34,23 +34,6 @@ const ENV_DATA = {
   humidity: { value: 42, label: '낮음',  level: 'mid',  unit: '%' },
 };
 
-// ─── skin analysis result (mock) — 4 specific factors ─────
-const SKIN_ANALYSIS = {
-  overall: 72,
-  factors: [
-    { id: 'pigment',  label: '색소 침착', score: 38, level: 'low',  delta: -4,
-      desc: '왼쪽 광대·이마 부근 색소 감지' },
-    { id: 'dryness',  label: '건조',     score: 48, level: 'low',  delta: -6,
-      desc: '볼·턱 라인 수분 부족' },
-    { id: 'pores',    label: '모공',     score: 55, level: 'mid',  delta: 0,
-      desc: 'T존 모공 확장 경미' },
-    { id: 'wrinkle',  label: '주름',     score: 78, level: 'good', delta: +1,
-      desc: '눈가 미세주름 양호' },
-  ],
-  detected: ['건조', '색소 침착', '모공 확장'],
-  message: '오늘 조치원은 미세먼지가 매우 나쁘고 자외선이 높아요. 색소 침착·건조 케어를 우선으로 추천드려요.',
-};
-
 // ─── recommendations ──────────────────────────────────────
 const PRODUCTS = [
   {
@@ -151,11 +134,6 @@ const PRODUCTS = [
   },
 ];
 
-const AVOID_INGREDIENTS = [
-  { name: '고농도 AHA (10%+)', reason: '오늘 자외선 높음 — 광민감 우려' },
-  { name: '향료·에센셜오일',   reason: '민감도 점수 78 — 자극 가능' },
-];
-
 // ─── history (past analyses) ──────────────────────────────
 const HISTORY = [
   { date: '2026.05.20', day: '오늘', region: '조치원읍', overall: 72, pm25: 87, uv: 6, top: '시카 진정 크림' },
@@ -180,7 +158,7 @@ const NOTIF_DEFAULTS = [
 ];
 
 export {
-  SKIN_TYPES, CONCERNS, ENV_DATA, SKIN_ANALYSIS,
-  PRODUCTS, AVOID_INGREDIENTS, HISTORY,
+  SKIN_TYPES, CONCERNS, ENV_DATA,
+  PRODUCTS, HISTORY,
   TREND_HYDRATION, TREND_OVERALL, NOTIF_DEFAULTS,
 };
