@@ -22,7 +22,6 @@ function ScreenAnalyzing({ ctx, nav }) {
   const [active, setActive] = React.useState(0);
   const [progress, setProgress] = React.useState(0);
 
-  // TODO: call /recommend with {lat, lng, skin_type, concerns} here
   React.useEffect(() => {
     const t1 = setTimeout(() => setActive(1), 1200);
     const t2 = setTimeout(() => setActive(2), 2400);
@@ -49,7 +48,7 @@ function ScreenAnalyzing({ ctx, nav }) {
     <div className="screen anim-fade" style={{
       background: 'linear-gradient(180deg, var(--accent-tint) 0%, var(--bg) 50%, var(--bg) 100%)',
     }}>
-      <div style={{ paddingTop: 60 }} />
+      <div style={{ paddingTop: 'max(24px, env(safe-area-inset-top))' }} />
       <div className="screen-body" style={{ display: 'flex', flexDirection: 'column', padding: '20px 24px' }}>
         {/* breathing orb */}
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
@@ -750,6 +749,7 @@ function ScreenMyPage({ ctx, nav }) {
   const setNotif = (id, v) => setNotifs(ns => ns.map(n => n.id === id ? { ...n, value: v } : n));
 
   const skinLabel = SKIN_TYPES.find(t => t.id === ctx.skinProfile?.type)?.label || '미설정';
+  const nickname = ctx.user?.nickname || '고객';
 
   return (
     <div className="screen anim-slide-r">
@@ -766,10 +766,10 @@ function ScreenMyPage({ ctx, nav }) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: 'var(--accent-strong)', fontSize: 22, fontWeight: 700,
                 fontFamily: 'var(--font-ui)',
-              }}>김</div>
+              }}>{nickname.charAt(0)}</div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>김세현</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>kim.sehyun@dbc.kr</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{nickname}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>이 기기에 저장된 로컬 프로필</div>
               </div>
               <button style={{
                 width: 36, height: 36, borderRadius: 9999, background: 'var(--bg-sunken)',
@@ -821,7 +821,7 @@ function ScreenMyPage({ ctx, nav }) {
           <Card padding={0}>
             <SettingRow icon={<IconShield size={16} />} label="개인정보 및 데이터" onClick={() => { }} />
             <SettingRow icon={<IconInfo size={16} />} label="버전 정보" value="0.4.1 · beta" chev={false} />
-            <SettingRow icon={<IconClose size={16} />} label="로그아웃" onClick={() => { }} danger last />
+            <SettingRow icon={<IconClose size={16} />} label="로그아웃" onClick={ctx.logout} danger last />
           </Card>
         </div>
       </div>

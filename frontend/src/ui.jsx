@@ -5,7 +5,7 @@ import { useId } from 'react';
 import { IconChevL, IconStar } from './icons';
 
 // ─── Button ────────────────────────────────────────────────
-function Button({ children, onClick, variant = 'primary', size = 'md', icon, iconRight, disabled, fullWidth, style }) {
+function Button({ children, onClick, type = 'button', variant = 'primary', size = 'md', icon, iconRight, disabled, fullWidth, style, ...buttonProps }) {
   const sizes = {
     sm: { h: 36, px: 14, fs: 13, r: 10 },
     md: { h: 48, px: 18, fs: 15, r: 14 },
@@ -24,6 +24,8 @@ function Button({ children, onClick, variant = 'primary', size = 'md', icon, ico
   const v = variants[variant];
   return (
     <button
+      type={type}
+      {...buttonProps}
       onClick={onClick}
       disabled={disabled}
       style={{
@@ -107,7 +109,7 @@ function Chip({ children, selected, onClick, size = 'md', icon }) {
 function NavTop({ title, onBack, right, transparent, sub }) {
   return (
     <div style={{
-      paddingTop: 54, // below status bar (status bar reserves ~50)
+      paddingTop: 'max(12px, env(safe-area-inset-top))',
       paddingBottom: 8,
       paddingLeft: 8,
       paddingRight: 8,
@@ -139,7 +141,7 @@ function NavTop({ title, onBack, right, transparent, sub }) {
 function BottomCTA({ children, style }) {
   return (
     <div style={{
-      padding: '14px 20px 30px',
+      padding: '14px 20px max(20px, env(safe-area-inset-bottom))',
       background: 'linear-gradient(to bottom, transparent, var(--bg) 30%)',
       ...style,
     }}>{children}</div>

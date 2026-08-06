@@ -17,8 +17,11 @@ function ScreenOnboarding({ ctx, nav }) {
   const [step, setStep] = React.useState(0); // 0: intro, 1: location, 2: camera
   const [perms, setPerms] = React.useState(ctx.permissions);
 
-  const grant = (key) => {
-    const next = { ...perms, [key]: true };
+  const grant = async (key) => {
+    const granted = key === 'location' && ctx.requestLocation
+      ? await ctx.requestLocation()
+      : true;
+    const next = { ...perms, [key]: granted };
     setPerms(next);
     ctx.set({ permissions: next });
     setTimeout(() => setStep(s => s + 1), 350);
@@ -61,9 +64,8 @@ function ScreenOnboarding({ ctx, nav }) {
           <Button onClick={() => setStep(1)} variant="primary" size="xl" fullWidth iconRight={<IconArrowR size={18}/>}>
             시작하기
           </Button>
-          <div style={{ textAlign: 'center', marginTop: 12 }}>
-            <span className="t-small">이미 계정이 있나요? </span>
-            <a style={{ fontSize: 13, color: 'var(--accent-strong)', fontWeight: 600, textDecoration: 'none' }}>로그인</a>
+          <div className="t-small" style={{ textAlign: 'center', marginTop: 12 }}>
+            닉네임은 이 기기의 로컬 프로필에만 저장됩니다.
           </div>
         </BottomCTA>
       </div>
@@ -138,7 +140,6 @@ function ScreenSkinSetup({ ctx, nav }) {
 
   const save = () => {
     ctx.set({ skinProfile: { type: skinType, concerns } });
-    // TODO: call /recommend init payload here — { skin_type: skinType, concerns }
     nav.go('home');
   };
 
@@ -238,7 +239,7 @@ function ScreenHome({ ctx, nav }) {
         pointerEvents: 'none',
       }}/>
 
-      <div style={{ paddingTop: 50 }}/>
+      <div style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}/>
 
       {/* greeting */}
       <div style={{ padding: '8px 22px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
@@ -247,11 +248,11 @@ function ScreenHome({ ctx, nav }) {
             2026 . 05 . 21  THU
           </div>
           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)', marginTop: 4, letterSpacing: '-0.025em' }}>
-            세현님,<br/>
+            {ctx.user?.nickname || '고객'}님,<br/>
             <span style={{ color: 'var(--accent-strong)' }}>오늘의 우리 동네</span>는요
           </div>
         </div>
-        <button onClick={() => nav.go('mypage')} style={{
+        <button type="button" aria-label="마이 페이지" onClick={() => nav.go('mypage')} style={{
           width: 38, height: 38, borderRadius: 9999, background: 'rgba(255,255,255,0.72)',
           backdropFilter: 'blur(8px)',
           border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -365,7 +366,24 @@ function ScreenHome({ ctx, nav }) {
             </div>
             <div style={{ flex: 1, fontSize: 13, color: 'var(--ink)', lineHeight: 1.55, letterSpacing: '-0.015em' }}>
               {ctx.recStatus === 'loading' && '오늘의 추천을 불러오는 중…'}
-              {ctx.recStatus === 'error' && '추천을 불러오지 못해 예시 데이터로 보여드려요.'}
+              {ctx.recStatus === 'error' && (
+                <div>
+                  <div>추천 서버에 연결하지 못해 예시 데이터로 보여드려요.</div>
+                  <button
+                    type="button"
+                    onClick={() => ctx.refreshRecommendation?.()}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      marginTop: 8, padding: '6px 10px',
+                      borderRadius: 9999, border: '1px solid var(--line-2)',
+                      background: '#fff', color: 'var(--accent-ink)',
+                      fontSize: 11, fontWeight: 700,
+                    }}
+                  >
+                    <IconRefresh size={13}/> 다시 연결
+                  </button>
+                </div>
+              )}
               {ctx.recStatus === 'ok' && (
                 <>
                   {ctx.recommend?.is_fallback && (
@@ -467,7 +485,11 @@ function ScreenCamera({ ctx, nav }) {
       }}/>
 
       {/* top bar */}
-      <div style={{ position: 'relative', zIndex: 2, paddingTop: 54, display: 'flex', justifyContent: 'space-between', padding: '54px 16px 0' }}>
+      <div style={{
+        position: 'relative', zIndex: 2,
+        display: 'flex', justifyContent: 'space-between',
+        padding: 'max(16px, env(safe-area-inset-top)) 16px 0',
+      }}>
         <button onClick={() => nav.go('home')} style={{
           width: 40, height: 40, borderRadius: 9999, background: 'rgba(0,0,0,0.5)',
           border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',

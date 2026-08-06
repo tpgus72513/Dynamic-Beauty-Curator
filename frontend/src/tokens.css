@@ -84,7 +84,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  background: oklch(0.93 0.008 90);
+  background: var(--bg);
   font-family: var(--font-ui);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
@@ -92,21 +92,129 @@ body {
 }
 button { font: inherit; cursor: pointer; }
 input, textarea, select { font: inherit; }
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid color-mix(in oklab, var(--accent-strong) 36%, transparent);
+  outline-offset: 3px;
+}
 
-/* App-internal content sizing — applies inside phone frame */
+/* Local nickname profile */
+.login-screen {
+  justify-content: flex-end;
+  padding: max(28px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom));
+  background:
+    linear-gradient(155deg, color-mix(in oklab, var(--accent-tint) 78%, white) 0 35%, transparent 58%),
+    var(--bg);
+}
+.login-contour {
+  position: absolute;
+  top: clamp(42px, 10vh, 92px);
+  right: clamp(22px, 9vw, 54px);
+  width: 156px;
+  height: 156px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-ink);
+}
+.login-contour span {
+  position: absolute;
+  border: 1px solid color-mix(in oklab, var(--accent-strong) 30%, transparent);
+  border-radius: 48% 52% 44% 56% / 58% 42% 58% 42%;
+  transform: rotate(var(--ring-rotate, 0deg));
+}
+.login-contour span:nth-child(1) { inset: 0; --ring-rotate: 12deg; }
+.login-contour span:nth-child(2) { inset: 18px; --ring-rotate: -9deg; }
+.login-contour span:nth-child(3) { inset: 36px; --ring-rotate: 20deg; background: color-mix(in oklab, var(--warm-soft) 74%, white); }
+.login-contour div {
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .12em;
+  font-weight: 700;
+}
+.login-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: 26px 22px 22px;
+  border: 1px solid color-mix(in oklab, var(--line-2) 80%, transparent);
+  border-radius: var(--r-xl);
+  background: color-mix(in oklab, var(--bg-elev) 94%, transparent);
+  box-shadow: var(--shadow-3);
+  backdrop-filter: blur(18px);
+}
+.login-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+.login-kicker span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-strong);
+}
+.login-card .h-display { margin: 18px 0 0; font-size: clamp(34px, 10vw, 44px); }
+.login-card .t-body { margin: 14px 0 0; max-width: 30ch; }
+.login-field { margin: 30px 0 18px; }
+.login-field label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 700; }
+.login-input-wrap { position: relative; }
+.login-input-wrap input {
+  width: 100%;
+  height: 58px;
+  padding: 0 58px 0 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 16px;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+}
+.login-input-wrap input[aria-invalid="true"] { border-color: var(--status-vbad); }
+.login-input-wrap > span {
+  position: absolute;
+  top: 50%;
+  right: 15px;
+  transform: translateY(-50%);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.login-hint,
+.login-error { min-height: 18px; margin: 7px 2px 0; font-size: 11px; line-height: 1.4; }
+.login-hint { color: var(--ink-3); }
+.login-error { color: var(--status-vbad); font-weight: 600; }
+
+/* App surface — no simulated phone hardware frame */
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+}
+
 .app-root {
   font-family: var(--font-kr);
   color: var(--ink);
   background: var(--bg);
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
   position: relative;
   overflow: hidden;
   letter-spacing: -0.015em;
 }
 .app-root * { box-sizing: border-box; }
 
-/* Screen container — fills phone interior under status bar, above home indicator */
+/* Screen container */
 .screen {
   position: absolute;
   inset: 0;
@@ -184,72 +292,21 @@ input, textarea, select { font: inherit; }
   animation: shimmer 1.6s linear infinite;
 }
 
-/* ─── stage (outer page) ──────────────────────────────── */
-.stage {
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: 1fr;
-  place-items: center;
-  padding: 32px 0;
-  background:
-    radial-gradient(1200px 600px at 20% 0%, oklch(0.95 0.012 90) 0%, transparent 60%),
-    radial-gradient(900px 500px at 80% 100%, oklch(0.95 0.012 30) 0%, transparent 60%),
-    oklch(0.93 0.008 90);
+@media (min-width: 481px) {
+  .app-shell {
+    background: var(--bg-sunken);
+  }
+
+  .app-root {
+    background: var(--bg);
+  }
 }
-.stage-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
-.label-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: oklch(0.45 0.008 90);
-}
-.label-bar .dot {
-  width: 5px; height: 5px; border-radius: 50%;
-  background: oklch(0.55 0.008 90);
-}
-.label-bar .name {
-  color: oklch(0.30 0.008 90);
-  font-weight: 600;
-}
-.dev-nav {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #fff;
-  border-radius: 9999px;
-  padding: 6px;
-  box-shadow: 0 2px 10px rgba(40,32,20,0.06);
-  border: 1px solid oklch(0.92 0.006 90);
-}
-.dev-nav button {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 9999px;
-  border: none;
-  background: transparent;
-  color: oklch(0.30 0.008 90);
-  font-size: 12px;
-  font-family: var(--font-mono);
-  letter-spacing: 0.02em;
-  transition: background 150ms;
-}
-.dev-nav button:hover { background: oklch(0.95 0.006 90); }
-.dev-nav button.active {
-  background: oklch(0.22 0.01 90);
-  color: #fff;
-}
-.dev-nav .arrow {
-  width: 32px; height: 32px; padding: 0;
-  display: flex; align-items: center; justify-content: center;
-}
-.dev-nav .arrow:disabled { opacity: 0.3; cursor: default; }
-.dev-nav .arrow:disabled:hover { background: transparent; }
