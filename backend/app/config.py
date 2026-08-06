@@ -5,11 +5,15 @@
 # ============================================================
 
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 # .env 파일을 읽어서 환경변수로 등록
 # (backend/.env 위치에 있다고 가정)
 load_dotenv()
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 
 class Settings:
@@ -30,6 +34,15 @@ class Settings:
 
     # 외부 API 호출 타임아웃 (초)
     API_TIMEOUT: int = 5
+
+    # ZIP 모델 패키지 런타임 계약
+    MODEL_DIR: Path = BACKEND_DIR / "model" / "skin_multitask"
+    MODEL_PATH: Path = MODEL_DIR / "final_model.keras"
+    MODEL_CONFIG_PATH: Path = MODEL_DIR / "inference_config.json"
+    MODEL_EXPECTED_PATH: Path = MODEL_DIR / "expected_predictions.json"
+    MODEL_SHA256: str = "E835BB5686FF5C3DDF83BA92D52EB7CB4D2E100D1097178775B08A68F313EB15"
+    RISK_RULES_PATH: Path = BACKEND_DIR / "data" / "skin_risk_rules.json"
+    MAX_IMAGE_BYTES: int = 10 * 1024 * 1024
 
 
 # 다른 파일에서 from config import settings 로 가져다 쓴다

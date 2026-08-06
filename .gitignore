@@ -16,6 +16,15 @@ venv/
 env/
 .venv/
 
+# 프론트엔드 의존성/빌드 산출물
+frontend/node_modules/
+frontend/dist/
+frontend/dist-*/
+
+# 로컬 피부 분석 모델과 얼굴 검증 이미지
+backend/model/skin_multitask/final_model.keras
+backend/model/skin_multitask/test_images/
+
 # 크롤링 결과 (용량이 크고, 각자 수집하므로)
 crawler/reviews_*.csv
 analysis/reviews_*.csv

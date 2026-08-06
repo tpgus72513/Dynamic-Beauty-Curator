@@ -1,0 +1,49 @@
+{
+  "model_name": "efficientnetb2_skin_multitask",
+  "model_file": "final_model.keras",
+  "tensorflow_version": "2.17.1",
+  "input_size": [
+    260,
+    260
+  ],
+  "color_mode": "RGB",
+  "preprocess_mode": "efficientnet_builtin_raw_0_255",
+  "normalization": "none",
+  "pixel_range": "0_255",
+  "output_activation": "sigmoid",
+  "output_shape": [
+    5
+  ],
+  "target_columns": [
+    "pigmentation",
+    "dryness",
+    "pore",
+    "wrinkle",
+    "sensitivity"
+  ],
+  "target_labels_ko": {
+    "pigmentation": "색소침착",
+    "dryness": "건조",
+    "pore": "모공",
+    "wrinkle": "주름",
+    "sensitivity": "민감"
+  },
+  "label_thresholds": {
+    "pigmentation": 157.0,
+    "dryness": 38.458375000000004,
+    "pore": 871.0,
+    "wrinkle": 41.80963888888889,
+    "sensitivity": 0.2
+  },
+  "selected_thresholds": {
+    "pigmentation": 0.2,
+    "dryness": 0.2,
+    "pore": 0.2,
+    "wrinkle": 0.2,
+    "sensitivity": 0.2
+  },
+  "loss": "custom weighted binary crossentropy",
+  "class_weight_file": "class_weight_info.json",
+  "risk_score_formula": "round(probability * 100)",
+  "main_risk_rule": "highest risk_score target"
+}

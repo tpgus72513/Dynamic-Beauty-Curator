@@ -1,0 +1,105 @@
+{
+  "description": "Expected predictions for backend preprocessing and output-mapping validation.",
+  "tolerance": {
+    "probability_abs_diff": 0.0001,
+    "risk_score_abs_diff": 1
+  },
+  "samples": [
+    {
+      "image_file": "test_images/sample_01.jpg",
+      "prediction": {
+        "skin_analysis": {
+          "pigmentation": {
+            "label_ko": "색소침착",
+            "probability": 0.004279,
+            "risk_score": 0,
+            "threshold": 0.2,
+            "risk_label": "low"
+          },
+          "dryness": {
+            "label_ko": "건조",
+            "probability": 0.356082,
+            "risk_score": 36,
+            "threshold": 0.2,
+            "risk_label": "high"
+          },
+          "pore": {
+            "label_ko": "모공",
+            "probability": 0.291914,
+            "risk_score": 29,
+            "threshold": 0.2,
+            "risk_label": "high"
+          },
+          "wrinkle": {
+            "label_ko": "주름",
+            "probability": 0.045361,
+            "risk_score": 5,
+            "threshold": 0.2,
+            "risk_label": "low"
+          },
+          "sensitivity": {
+            "label_ko": "민감",
+            "probability": 0.60256,
+            "risk_score": 60,
+            "threshold": 0.2,
+            "risk_label": "high"
+          }
+        },
+        "main_risk": "sensitivity",
+        "main_risk_label_ko": "민감",
+        "main_risk_score": 60,
+        "pigmentation_probability": 0.004279,
+        "pigmentation_risk_score": 0,
+        "pigmentation_risk_label": "low"
+      }
+    },
+    {
+      "image_file": "test_images/sample_02.jpg",
+      "prediction": {
+        "skin_analysis": {
+          "pigmentation": {
+            "label_ko": "색소침착",
+            "probability": 0.99908,
+            "risk_score": 100,
+            "threshold": 0.2,
+            "risk_label": "high"
+          },
+          "dryness": {
+            "label_ko": "건조",
+            "probability": 0.688925,
+            "risk_score": 69,
+            "threshold": 0.2,
+            "risk_label": "high"
+          },
+          "pore": {
+            "label_ko": "모공",
+            "probability": 0.817949,
+            "risk_score": 82,
+            "threshold": 0.2,
+            "risk_label": "high"
+          },
+          "wrinkle": {
+            "label_ko": "주름",
+            "probability": 0.991063,
+            "risk_score": 99,
+            "threshold": 0.2,
+            "risk_label": "high"
+          },
+          "sensitivity": {
+            "label_ko": "민감",
+            "probability": 0.085052,
+            "risk_score": 9,
+            "threshold": 0.2,
+            "risk_label": "low"
+          }
+        },
+        "main_risk": "pigmentation",
+        "main_risk_label_ko": "색소침착",
+        "main_risk_score": 100,
+        "pigmentation_probability": 0.99908,
+        "pigmentation_risk_score": 100,
+        "pigmentation_risk_label": "high"
+      }
+    }
+  ]
+}
