@@ -12,11 +12,27 @@
 #   http://127.0.0.1:8000/docs   → API 문서 (여기서 직접 테스트 가능!)
 # ============================================================
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime, timezone
+from functools import partial
 
-from config import check_keys
-from schemas import RecommendRequest, RecommendResponse
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
+
+from config import check_keys, settings
+from image_upload import (
+    read_limited_upload,
+    validate_content_type,
+    validate_decodable_image,
+)
+from schemas import AnalyzeResponse, RecommendRequest, RecommendResponse
+from skin_analyzer import (
+    InvalidModelOutputError,
+    ModelUnavailableError,
+    analyze_image,
+    initialize_skin_analyzer,
+    model_status,
+)
 import recommender
 
 
@@ -49,6 +65,7 @@ def on_startup():
     print(" 다이내믹 뷰티 큐레이터 API 시작")
     print("=" * 50)
     check_keys()
+    initialize_skin_analyzer()
 
 
 # ------------------------------------------------------------
@@ -61,6 +78,17 @@ def health_check():
         "status": "ok",
         "service": "Dynamic Beauty Curator API",
         "message": "서버가 정상 동작 중입니다. /docs 에서 API를 테스트하세요.",
+        "model": model_status(),
+    }
+
+
+def assemble_analyze_response(analysis: dict, recommendation: dict) -> dict:
+    status = model_status()
+    return {
+        **analysis,
+        **recommendation,
+        "analyzed_at": datetime.now(timezone.utc),
+        "model": {"name": status["name"], "version": status["version"]},
     }
 
 
@@ -97,3 +125,48 @@ def recommend_skincare(request: RecommendRequest):
             status_code=500,
             detail=f"추천 처리 중 오류가 발생했습니다: {str(e)}",
         )
+
+
+@app.post("/analyze", response_model=AnalyzeResponse)
+async def analyze_skin(
+    image: UploadFile = File(...),
+    nickname: str = Form(..., min_length=1, max_length=12),
+    lat: float = Form(...),
+    lng: float = Form(...),
+    skin_type: str = Form(...),
+):
+    """Analyze one image in memory and compose a personalized routine."""
+    clean_nickname = nickname.strip()
+    if not clean_nickname or len(clean_nickname) > 12:
+        raise HTTPException(
+            status_code=422,
+            detail="닉네임은 1~12자로 입력해 주세요.",
+        )
+
+    validate_content_type(image.content_type)
+    image_bytes = await read_limited_upload(image, settings.MAX_IMAGE_BYTES)
+    validate_decodable_image(image_bytes)
+
+    try:
+        analysis = await run_in_threadpool(analyze_image, image_bytes)
+        recommend_call = partial(
+            recommender.recommend,
+            lat=lat,
+            lng=lng,
+            skin_type=skin_type,
+            nickname=clean_nickname,
+            skin_analysis=analysis["skin_analysis"],
+        )
+        recommendation = await run_in_threadpool(recommend_call)
+    except ModelUnavailableError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="피부 분석 모델을 사용할 수 없습니다.",
+        ) from exc
+    except InvalidModelOutputError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="피부 분석 결과를 확인할 수 없습니다.",
+        ) from exc
+
+    return assemble_analyze_response(analysis, recommendation)

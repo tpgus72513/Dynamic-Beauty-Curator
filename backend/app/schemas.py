@@ -8,8 +8,10 @@
 #   - API 문서(/docs)에 형태가 자동으로 표시됨
 # ============================================================
 
+from datetime import datetime
+from typing import Dict, List
+
 from pydantic import BaseModel, Field
-from typing import List, Optional
 
 
 # ------------------------------------------------------------
@@ -49,6 +51,27 @@ class RecommendItem(BaseModel):
     ingredient: str = Field(..., description="추천 성분", example="BHA")
 
 
+class SkinMetric(BaseModel):
+    label_ko: str
+    probability: float = Field(..., ge=0, le=1)
+    risk_score: int = Field(..., ge=0, le=100)
+    threshold: float = Field(..., ge=0, le=1)
+    risk_label: str
+
+
+class RankingSignal(BaseModel):
+    kind: str
+    value: str
+    weight: float
+    source: str
+    reason: str
+
+
+class ModelInfo(BaseModel):
+    name: str
+    version: str
+
+
 # ------------------------------------------------------------
 # 응답 형태: 서버가 앱으로 돌려주는 최종 데이터
 # ------------------------------------------------------------
@@ -68,3 +91,19 @@ class RecommendResponse(BaseModel):
         default=False,
         description="True면 외부 API 장애로 시드 데이터를 사용한 응답임",
     )
+
+
+class AnalyzeResponse(BaseModel):
+    analyzed_at: datetime
+    model: ModelInfo
+    skin_analysis: Dict[str, SkinMetric]
+    focus_risks: List[str]
+    main_risk: str
+    main_risk_score: int = Field(..., ge=0, le=100)
+    message: str
+    env_data: EnvData
+    recommendations: List[RecommendItem]
+    avoid: List[str]
+    ranking_signals: List[RankingSignal]
+    rule_id: str
+    is_fallback: bool
