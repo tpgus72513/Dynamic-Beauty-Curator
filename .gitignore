@@ -20,6 +20,8 @@ env/
 frontend/node_modules/
 frontend/dist/
 frontend/dist-*/
+frontend/test-results/
+frontend/playwright-report/
 
 # 로컬 피부 분석 모델과 얼굴 검증 이미지
 backend/model/skin_multitask/final_model.keras

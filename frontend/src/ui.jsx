@@ -121,7 +121,7 @@ function NavTop({ title, onBack, right, transparent, sub }) {
       zIndex: 5,
     }}>
       {onBack ? (
-        <button onClick={onBack} style={{
+        <button type="button" aria-label="뒤로" onClick={onBack} style={{
           width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'transparent', border: 'none', borderRadius: 9999, color: 'var(--ink)',
         }}>

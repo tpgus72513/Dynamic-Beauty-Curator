@@ -1,90 +1,141 @@
-# 다이내믹 뷰티 큐레이터 (Dynamic Beauty Curator)
+# Dynamic Beauty Curator
 
-정적 피부 타입 데이터와 실시간 환경 지표(미세먼지·자외선·수질)를 결합하여
-GPS 기반 스킨케어 추천을 제공하는 백엔드 API 프로젝트.
+얼굴 사진을 로컬 TensorFlow 모델로 분석하고, 색소침착·건조·모공·주름·민감 위험도와 현재 환경을 조합해 제품 순서와 추천 문구를 개인화하는 프로토타입입니다.
 
-- 팀: 5명 (테크리드 / 백엔드 / 프론트 / 데이터분석가 / 보조코딩 / PPT)
-- 기간: 2026. 5. 13 ~ 2026. 5. 29
+현재 구현 범위:
 
----
+- 닉네임 로컬 로그인 및 로그아웃
+- 브라우저 카메라 촬영과 JPG·PNG·WEBP 파일 선택
+- `backend_package.zip`의 5출력 모델을 사용하는 실제 분석
+- 5개 위험도, 상위 2개 우선 관리 항목, 위험도별 추천 문구
+- 위험도·환경·성분 가중치에 따른 제품 정렬 및 제외 성분 안내
 
-## 1. 폴더 구조
+공개 배포는 포함하지 않았습니다. 현재는 로컬에서 백엔드와 프론트엔드를 각각 실행합니다.
 
-```
-dynamic-beauty-curator/
-├── README.md                  ← 지금 이 파일. 제일 먼저 읽기
-│
-├── backend/                   ← [백엔드 담당] FastAPI 추천 서버
-│   ├── requirements.txt           설치할 라이브러리 목록
-│   ├── .env.example               API 키 입력 양식 (복사해서 .env로 사용)
-│   ├── run.py                     서버 실행 진입점
-│   └── app/
-│       ├── main.py                FastAPI 앱 + /recommend 엔드포인트
-│       ├── schemas.py             요청/응답 JSON 형태 정의
-│       ├── config.py              .env에서 API 키 읽어오기
-│       ├── env_client.py          외부 환경 API 호출 (기상청·에어코리아)
-│       ├── recommender.py         매칭 룰북 조회 + 추천 메시지 생성
-│       └── fallback.py            외부 API 장애 시 시드 응답
-│   └── data/
-│       ├── rules.json             매칭 룰북 (분석가 → 코딩러가 변환)
-│       └── demo_seed.json         발표 안전망용 시드 데이터
-│
-├── crawler/                   ← [보조코딩 담당] 올리브영 리뷰 크롤러
-│   ├── requirements.txt
-│   ├── step1_open.py              1단계: 크롬 열기 연습
-│   ├── step2_one_review.py        2단계: 리뷰 1개 읽기 연습
-│   ├── crawler_final.py           최종: 여러 페이지 → CSV 저장
-│   ├── crawl_all.py               제품 목록 전체 자동 수집
-│   └── products.csv               수집 대상 제품 목록 (직접 채우기)
-│
-├── analysis/                  ← [데이터분석가 담당] 리뷰 NLP 분석
-│   ├── requirements.txt
-│   ├── nlp_keywords.py            환경 키워드 ↔ 성분 키워드 빈도 분석
-│   └── build_rulebook.py          분석 결과 → rules.json 생성
-│
-└── docs/
-    └── API_SETUP.md               외부 API 키 발급 방법 정리
+## 1. 준비물
+
+- Windows PowerShell
+- Python과 Node.js/npm
+- 모델 원본: `C:\Users\sunny\Downloads\backend_package.zip`
+
+저장소 루트에서 아래 명령을 실행합니다.
+
+```powershell
+python -m venv .venv
+& ".\.venv\Scripts\python.exe" -m pip install --upgrade pip
+& ".\.venv\Scripts\python.exe" -m pip install -r backend\requirements.txt
+Set-Location frontend
+npm.cmd install
+Set-Location ..
 ```
 
-## 2. 역할별 작업 순서
+외부 환경 API 키는 선택 사항입니다. 키가 없거나 호출에 실패하면 발표용 fallback 환경 데이터를 사용합니다. 실제 키를 쓰려면 `backend\.env.example`을 `backend\.env`로 복사한 뒤 값을 입력하세요. `.env`는 Git에 올리지 않습니다.
 
-### 백엔드 담당
-1. `docs/API_SETUP.md` 읽고 외부 API 키 발급
-2. `backend/.env.example`을 복사해 `.env` 만들고 키 입력
-3. `backend/requirements.txt` 설치
-4. `backend/run.py` 실행 → 서버가 뜨는지 확인
-5. `app/main.py`부터 차근차근 코드 이해
+## 2. ZIP 모델 설치
 
-### 보조코딩 담당
-1. `crawler/requirements.txt` 설치
-2. `crawler/step1_open.py` → `step2_one_review.py` 순서로 실행하며 연습
-3. 올리브영에서 '검사'로 셀렉터 확인 후 `crawler_final.py`의 셀렉터 교체
-4. `products.csv`에 수집 대상 제품 채우기
-5. `crawl_all.py`로 전체 수집 → `reviews_all.csv` 생성
+ZIP이 모델 계약의 기준입니다. 실제 계약은 `260×260 RGB`, 외부 입력 `float32 0~255`, 모델 내부 정규화, Sigmoid 5출력 `[색소침착, 건조, 모공, 주름, 민감]`입니다. API에서 이미지를 `/255`로 다시 나누지 않습니다.
 
-### 데이터분석가 담당
-1. 보조코딩이 만든 `reviews_all.csv`를 `analysis/` 폴더에 복사
-2. `analysis/nlp_keywords.py` 실행 → 키워드 빈도 확인
-3. `analysis/build_rulebook.py` 실행 → `backend/data/rules.json` 생성
-4. 생성된 rules.json을 백엔드 담당과 공유
-
-## 3. 전체 데이터 흐름
-
-```
-[보조코딩] 올리브영 크롤링 → reviews_all.csv
-                                  ↓
-[분석가]   NLP 키워드 분석 → rules.json (매칭 룰북)
-                                  ↓
-[백엔드]   FastAPI 서버가 rules.json 읽음
-           + 외부 API(미세먼지·자외선) 실시간 호출
-                                  ↓
-           POST /recommend → 추천 JSON 응답
-                                  ↓
-[프론트]   앱 화면에 추천 카드 표시
+```powershell
+$packageZip = 'C:\Users\sunny\Downloads\backend_package.zip'
+$extractDir = Join-Path $env:TEMP 'dbc_backend_package_install'
+New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+Expand-Archive -LiteralPath $packageZip -DestinationPath $extractDir -Force
+New-Item -ItemType Directory -Force -Path 'backend\model\skin_multitask' | Out-Null
+Copy-Item -LiteralPath "$extractDir\backend_package\final_model.keras" -Destination 'backend\model\skin_multitask\final_model.keras'
+Copy-Item -LiteralPath "$extractDir\backend_package\inference_config.json" -Destination 'backend\model\skin_multitask\inference_config.json'
+Copy-Item -LiteralPath "$extractDir\backend_package\expected_predictions.json" -Destination 'backend\model\skin_multitask\expected_predictions.json'
+Copy-Item -LiteralPath "$extractDir\backend_package\test_images" -Destination 'backend\model\skin_multitask\test_images' -Recurse -Force
 ```
 
-## 4. 주의사항
+체크섬을 확인합니다.
 
-- 코드의 셀렉터(`.review_list li` 등)는 **예시**입니다. 올리브영에서 직접 '검사'로 확인 후 교체하세요.
-- `.env` 파일에는 API 키가 들어가므로 **절대 깃에 올리지 마세요** (`.gitignore`에 추가).
-- 발표 데모는 라이브 API에 의존하지 말고 `demo_seed.json` fallback을 반드시 준비하세요.
+```powershell
+Get-FileHash backend\model\skin_multitask\final_model.keras -Algorithm SHA256
+```
+
+예상 SHA-256:
+
+```text
+E835BB5686FF5C3DDF83BA92D52EB7CB4D2E100D1097178775B08A68F313EB15
+```
+
+모델 파일과 얼굴 검증 이미지는 `.gitignore`로 제외되어 Git에 올라가지 않습니다.
+
+## 3. 실행 방법
+
+PowerShell 터미널 두 개를 엽니다.
+
+터미널 1 — 백엔드:
+
+```powershell
+Set-Location backend
+& "..\.venv\Scripts\python.exe" run.py
+```
+
+터미널 2 — 프론트엔드:
+
+```powershell
+Set-Location frontend
+npm.cmd run dev -- --host 127.0.0.1
+```
+
+브라우저에서 다음 주소를 엽니다.
+
+- 앱: `http://127.0.0.1:5173`
+- API 상태: `http://127.0.0.1:8000`
+- API 문서: `http://127.0.0.1:8000/docs`
+
+카메라는 브라우저 보안 정책상 `localhost`/`127.0.0.1` 또는 HTTPS에서만 사용하세요. 권한이 없거나 카메라가 없는 경우 화면의 `사진 선택`을 사용할 수 있습니다.
+
+## 4. 데이터 및 개인정보 처리
+
+- 닉네임만 브라우저 `localStorage`에 `dbc.nickname`으로 저장합니다.
+- 촬영·선택한 사진은 분석을 위해 로컬 백엔드로 전송됩니다.
+- 백엔드는 이미지 바이트를 메모리에서만 디코딩·추론하고 파일이나 데이터베이스에 저장하지 않습니다.
+- 성공 후 사진 참조를 즉시 해제하며, 실패 시에는 사용자가 재시도하는 동안에만 프론트 메모리에 유지합니다.
+- 화면의 위험도는 화장품 추천을 위한 AI 결과이며 의료 진단이 아닙니다.
+
+## 5. 검증
+
+저장소 루트에서 백엔드 테스트:
+
+```powershell
+& ".\.venv\Scripts\python.exe" -m pytest backend\tests -q
+```
+
+프론트엔드 단위 테스트, 린트, 빌드:
+
+```powershell
+Set-Location frontend
+npm.cmd test
+npm.cmd run lint
+npm.cmd run build
+```
+
+전체 브라우저 흐름 테스트는 백엔드·프론트 서버를 자동으로 시작하고 Chromium의 가상 카메라로 실제 모델 추론까지 실행합니다.
+
+```powershell
+npm.cmd run e2e
+```
+
+처음 한 번 Playwright 브라우저가 없다면 설치합니다.
+
+```powershell
+npx.cmd playwright install chromium
+```
+
+Codex 관리 환경에서 한글 경로의 기존 `dist` 삭제가 차단되어 Vite가 오류 메시지 없이 종료되는 경우에만 다음 검증 명령을 사용합니다. 일반 개발 환경에서는 표준 `npm.cmd run build`를 사용하세요.
+
+```powershell
+npm.cmd run build -- --emptyOutDir=false
+```
+
+## 6. 주요 폴더
+
+```text
+backend/app/                         FastAPI, 모델 추론, 추천 규칙
+backend/data/skin_risk_rules.json   5개 위험도별 카테고리·성분·제외 규칙
+backend/model/skin_multitask/       모델 계약과 로컬 모델 위치
+frontend/src/                       React 화면, 카메라, API 연결, 개인화 정렬
+frontend/e2e/                       전체 사용자 흐름 테스트
+```
