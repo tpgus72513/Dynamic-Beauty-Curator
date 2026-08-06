@@ -1,0 +1,32 @@
+{
+  "pigmentation": {
+    "label_ko": "색소침착",
+    "categories": ["선케어"],
+    "ingredients": ["나이아신아마이드", "비타민 C"],
+    "avoid": []
+  },
+  "dryness": {
+    "label_ko": "건조",
+    "categories": ["보습", "에센스"],
+    "ingredients": ["히알루론산", "세라마이드", "판테놀"],
+    "avoid": []
+  },
+  "pore": {
+    "label_ko": "모공",
+    "categories": ["클렌징"],
+    "ingredients": ["BHA", "나이아신아마이드"],
+    "avoid": []
+  },
+  "wrinkle": {
+    "label_ko": "주름",
+    "categories": ["에센스", "진정·보습"],
+    "ingredients": ["펩타이드", "아데노신", "세라마이드"],
+    "avoid": []
+  },
+  "sensitivity": {
+    "label_ko": "민감",
+    "categories": ["진정·보습", "미스트"],
+    "ingredients": ["센텔라", "판테놀"],
+    "avoid": ["향료", "에센셜오일", "고농도 AHA"]
+  }
+}

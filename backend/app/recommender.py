@@ -22,6 +22,15 @@ def _load_rules():
 _RULES = _load_rules()
 
 
+def _load_risk_rules():
+    with open(settings.RISK_RULES_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+_RISK_RULES = _load_risk_rules()
+RANK_MULTIPLIERS = [1.0, 0.75, 0.35, 0.35, 0.35]
+
+
 # ------------------------------------------------------------
 # 1. 환경 데이터 가져오기 (외부 API → 실패 시 fallback)
 # ------------------------------------------------------------
@@ -144,10 +153,219 @@ def build_message(env: dict, rule: dict) -> str:
     return "".join(parts)
 
 
+def build_ranking_signals(skin_analysis: dict, env: dict) -> list[dict]:
+    """Convert continuous model probabilities into deterministic rank signals."""
+    ordered = sorted(
+        skin_analysis,
+        key=lambda target: skin_analysis[target]["probability"],
+        reverse=True,
+    )
+    positive = []
+    avoids = []
+
+    for rank, target in enumerate(ordered):
+        probability = float(skin_analysis[target]["probability"])
+        multiplier = RANK_MULTIPLIERS[rank]
+        rule = _RISK_RULES[target]
+        reason = f"{rule['label_ko']} 위험도 {round(probability * 100)}"
+
+        for category in rule["categories"]:
+            positive.append(
+                {
+                    "kind": "category",
+                    "value": category,
+                    "weight": round(18 * probability * multiplier, 4),
+                    "source": f"risk:{target}",
+                    "reason": reason,
+                }
+            )
+        for ingredient in rule["ingredients"][:2]:
+            positive.append(
+                {
+                    "kind": "ingredient",
+                    "value": ingredient,
+                    "weight": round(12 * probability * multiplier, 4),
+                    "source": f"risk:{target}",
+                    "reason": reason,
+                }
+            )
+
+        threshold = float(skin_analysis[target].get("threshold", 0.2))
+        if probability >= threshold:
+            for value in rule["avoid"]:
+                avoids.append(
+                    {
+                        "kind": "avoid",
+                        "value": value,
+                        "weight": -100.0,
+                        "source": f"risk:{target}",
+                        "reason": reason,
+                    }
+                )
+
+    environment = []
+    if env["uv_grade"] in {"높음", "매우높음"}:
+        environment.append(
+            {
+                "kind": "category",
+                "value": "선케어",
+                "weight": 10.0,
+                "source": "environment:uv",
+                "reason": f"자외선 {env['uv_grade']}",
+            }
+        )
+        avoids.extend(
+            [
+                {
+                    "kind": "avoid",
+                    "value": "고농도 AHA",
+                    "weight": -100.0,
+                    "source": "environment:uv",
+                    "reason": f"자외선 {env['uv_grade']}",
+                },
+                {
+                    "kind": "avoid",
+                    "value": "레티놀",
+                    "weight": -100.0,
+                    "source": "environment:uv",
+                    "reason": f"자외선 {env['uv_grade']}",
+                },
+            ]
+        )
+    if env["pm25_grade"] in {"나쁨", "매우나쁨"}:
+        environment.extend(
+            [
+                {
+                    "kind": "category",
+                    "value": "클렌징",
+                    "weight": 10.0,
+                    "source": "environment:pm25",
+                    "reason": f"미세먼지 {env['pm25_grade']}",
+                },
+                {
+                    "kind": "ingredient",
+                    "value": "센텔라",
+                    "weight": 10.0,
+                    "source": "environment:pm25",
+                    "reason": f"미세먼지 {env['pm25_grade']}",
+                },
+            ]
+        )
+
+    deduplicated_avoids = list(
+        {(signal["kind"], signal["value"]): signal for signal in avoids}.values()
+    )
+    return (
+        sorted(positive, key=lambda signal: signal["weight"], reverse=True)
+        + environment[:2]
+        + deduplicated_avoids
+    )
+
+
+def build_personalized_message(
+    nickname: str,
+    skin_analysis: dict,
+    env: dict,
+    signals: list[dict],
+) -> str:
+    ordered = sorted(
+        skin_analysis,
+        key=lambda target: skin_analysis[target]["probability"],
+        reverse=True,
+    )
+    labels = [_RISK_RULES[target]["label_ko"] for target in ordered[:2]]
+
+    conditions = []
+    if env["pm25_grade"] in {"나쁨", "매우나쁨"}:
+        conditions.append(f"미세먼지는 {env['pm25_grade']} 단계")
+    if env["uv_grade"] in {"높음", "매우높음"}:
+        conditions.append(f"자외선은 {env['uv_grade']} 단계")
+    if env.get("water") == "주의":
+        conditions.append("수질은 주의 단계")
+
+    environment_phrase = (
+        f"현재 {'이고, '.join(conditions)}예요."
+        if conditions
+        else "현재 환경은 비교적 쾌적해요."
+    )
+    positive_values = [
+        signal["value"]
+        for signal in signals
+        if signal["kind"] in {"category", "ingredient"}
+    ]
+    focus_values = list(dict.fromkeys(positive_values))[:2]
+    care_phrase = " · ".join(focus_values)
+
+    return (
+        f"{nickname}님은 {labels[0]}와 {labels[1]} 위험도가 상대적으로 높아요. "
+        f"{environment_phrase} {care_phrase} 중심의 케어를 추천해요."
+    )
+
+
+def build_env_response(env: dict) -> dict:
+    return {
+        "region": env["region"],
+        "pm25": env["pm25"],
+        "pm25_grade": env["pm25_grade"],
+        "uv": env["uv"],
+        "uv_grade": env["uv_grade"],
+        "water": env["water"],
+    }
+
+
+def merge_recommendations(rule: dict, signals: list[dict]) -> list[dict]:
+    items = []
+    seen = set()
+    positive = [
+        signal
+        for signal in signals
+        if signal["kind"] in {"category", "ingredient"}
+    ]
+    for category_signal in [
+        signal for signal in positive if signal["kind"] == "category"
+    ]:
+        ingredients = [
+            signal
+            for signal in positive
+            if signal["kind"] == "ingredient"
+            and signal["source"] == category_signal["source"]
+        ]
+        ingredient = (
+            ingredients[0]["value"] if ingredients else category_signal["value"]
+        )
+        key = (category_signal["value"], ingredient)
+        if key not in seen:
+            seen.add(key)
+            items.append(
+                {"step": len(items) + 1, "category": key[0], "ingredient": key[1]}
+            )
+
+    for original in rule.get("recommendations", []):
+        key = (original["category"], original["ingredient"])
+        if key not in seen:
+            seen.add(key)
+            items.append({**original, "step": len(items) + 1})
+    return items
+
+
+def merge_avoid(rule: dict, signals: list[dict]) -> list[str]:
+    values = [
+        *rule.get("avoid", []),
+        *[signal["value"] for signal in signals if signal["kind"] == "avoid"],
+    ]
+    return list(dict.fromkeys(values))
+
+
 # ------------------------------------------------------------
 # 4. 전체 추천 흐름 (main.py가 이 함수를 호출)
 # ------------------------------------------------------------
-def recommend(lat: float, lng: float, skin_type: str) -> dict:
+def recommend(
+    lat: float,
+    lng: float,
+    skin_type: str,
+    nickname: str | None = None,
+    skin_analysis: dict | None = None,
+) -> dict:
     """
     추천 전체 파이프라인을 실행하고 응답 데이터를 조립한다.
 
@@ -160,22 +378,26 @@ def recommend(lat: float, lng: float, skin_type: str) -> dict:
     # (2) 룰북 조회
     rule = match_rule(skin_type, env["pm25_grade"], env["uv_grade"])
 
-    # (3) 메시지 생성
-    message = build_message(env, rule)
+    # (3) 분석 결과가 있으면 위험도 기반 신호와 개인화 메시지 생성
+    signals = build_ranking_signals(skin_analysis, env) if skin_analysis else []
+    message = (
+        build_personalized_message(
+            nickname or "고객",
+            skin_analysis,
+            env,
+            signals,
+        )
+        if skin_analysis
+        else build_message(env, rule)
+    )
 
     # (4) 응답 조립
     return {
         "message": message,
-        "env_data": {
-            "region": env["region"],
-            "pm25": env["pm25"],
-            "pm25_grade": env["pm25_grade"],
-            "uv": env["uv"],
-            "uv_grade": env["uv_grade"],
-            "water": env["water"],
-        },
-        "recommendations": rule.get("recommendations", []),
-        "avoid": rule.get("avoid", []),
+        "env_data": build_env_response(env),
+        "recommendations": merge_recommendations(rule, signals),
+        "avoid": merge_avoid(rule, signals),
+        "ranking_signals": signals,
         "rule_id": rule.get("rule_id", "unknown"),
         "is_fallback": is_fallback,
     }
