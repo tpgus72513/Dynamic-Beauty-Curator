@@ -1,12 +1,12 @@
 // src/App.jsx — App shell, router, AppContext
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ENV_DATA } from './data';
 import { ScreenLogin } from './screens-login';
 import { ScreenOnboarding, ScreenSkinSetup, ScreenHome, ScreenCamera } from './screens-1-4';
 import { ScreenAnalyzing, ScreenResult, ScreenRecommendations, ScreenHistory, ScreenMyPage } from './screens-5-9';
-import { getRecommend } from './api/client';
-import { adaptEnvData } from './api/adapters';
+import { analyzeSkin, getRecommend } from './api/client';
+import { adaptEnvData, adaptSkinAnalysis } from './api/adapters';
 import { clearNickname, readNickname, saveNickname } from './profile';
 import { requestUserCamera, stopMediaStream } from './camera';
 
@@ -70,6 +70,10 @@ function App() {
     concerns: ['redness', 'dry'],
   });
   const [lastAnalysis, setLastAnalysis] = useState(null);
+  const [analysisStatus, setAnalysisStatus] = useState('idle');
+  const [analysisError, setAnalysisError] = useState('');
+  const analysisControllerRef = useRef(null);
+  const analysisImageRef = useRef(null);
   const [location, setLocation] = useState(DEFAULT_LOCATION);
   const [locationStatus, setLocationStatus] = useState('idle');
 
@@ -86,6 +90,9 @@ function App() {
   }, []);
 
   const logout = useCallback(() => {
+    analysisControllerRef.current?.abort();
+    analysisControllerRef.current = null;
+    analysisImageRef.current = null;
     clearNickname();
     setUser({ nickname: '' });
     setLastAnalysis(null);
@@ -137,6 +144,70 @@ function App() {
       setPermissions(current => ({ ...current, camera: false }));
       return false;
     }
+  }, []);
+
+  const startAnalysis = useCallback(async (image) => {
+    analysisControllerRef.current?.abort();
+    const controller = new AbortController();
+    analysisControllerRef.current = controller;
+    analysisImageRef.current = image;
+    setAnalysisStatus('uploading');
+    setAnalysisError('');
+    setRoute('analyzing');
+
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 60_000);
+
+    try {
+      const response = await analyzeSkin({
+        image,
+        nickname: user.nickname,
+        lat: location.lat,
+        lng: location.lng,
+        skin_type: skinProfile.type,
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted || analysisControllerRef.current !== controller) return;
+
+      setLastAnalysis(adaptSkinAnalysis(response));
+      setEnv(adaptEnvData(response.env_data));
+      setRecommend(response);
+      setRecStatus('ok');
+      setRecError('');
+      setAnalysisStatus('completed');
+      analysisImageRef.current = null;
+      setRoute('result');
+    } catch (error) {
+      if (analysisControllerRef.current !== controller) return;
+      if (timedOut) {
+        setAnalysisError('분석 시간이 초과되었습니다. 다시 시도해 주세요.');
+        setAnalysisStatus('error');
+      } else if (error.name !== 'AbortError') {
+        setAnalysisError(error.message || '피부 분석에 실패했습니다.');
+        setAnalysisStatus('error');
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      if (analysisControllerRef.current === controller) {
+        analysisControllerRef.current = null;
+      }
+    }
+  }, [location.lat, location.lng, skinProfile.type, user.nickname]);
+
+  const retryAnalysis = useCallback(() => {
+    if (analysisImageRef.current) startAnalysis(analysisImageRef.current);
+  }, [startAnalysis]);
+
+  const cancelAnalysis = useCallback((destination = 'camera') => {
+    analysisControllerRef.current?.abort();
+    analysisControllerRef.current = null;
+    analysisImageRef.current = null;
+    setAnalysisStatus('idle');
+    setAnalysisError('');
+    setRoute(destination);
   }, []);
 
   const refreshRecommendation = useCallback(async ({
@@ -202,6 +273,11 @@ function App() {
     locationStatus,
     requestLocation,
     requestCameraPermission,
+    startAnalysis,
+    retryAnalysis,
+    cancelAnalysis,
+    analysisStatus,
+    analysisError,
     refreshRecommendation,
     set: (patch) => {
       if ('permissions' in patch) setPermissions(patch.permissions);

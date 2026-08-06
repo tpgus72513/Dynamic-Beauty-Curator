@@ -19,30 +19,28 @@ function ScreenAnalyzing({ ctx, nav }) {
     { id: 1, label: '환경 데이터 결합 중…', sub: '미세먼지·자외선·수질 호출', icon: <IconLeaf size={20} /> },
     { id: 2, label: '맞춤 제품 찾는 중…', sub: '룰북 + 리뷰 NLP 매칭', icon: <IconSparkle size={20} /> },
   ];
-  const [active, setActive] = React.useState(0);
-  const [progress, setProgress] = React.useState(0);
+  const active = ctx.analysisStatus === 'uploading' ? 0 : 1;
 
-  React.useEffect(() => {
-    const t1 = setTimeout(() => setActive(1), 1200);
-    const t2 = setTimeout(() => setActive(2), 2400);
-    const t3 = setTimeout(() => {
-      // push analysis to history
-      const entry = { date: '2026.05.20', day: '오늘', region: ctx.env.region, overall: SKIN_ANALYSIS.overall, pm25: ctx.env.pm25.value, uv: ctx.env.uv.value, top: '시카 진정 크림' };
-      ctx.set({ lastAnalysis: SKIN_ANALYSIS });
-      nav.go('result');
-    }, 3600);
-    return () => [t1, t2, t3].forEach(clearTimeout);
-  }, []);
-
-  React.useEffect(() => {
-    let p = 0;
-    const id = setInterval(() => {
-      p = Math.min(100, p + 2.8);
-      setProgress(p);
-      if (p >= 100) clearInterval(id);
-    }, 100);
-    return () => clearInterval(id);
-  }, []);
+  if (ctx.analysisStatus === 'error') {
+    return (
+      <div className="screen anim-fade">
+        <NavTop title="분석을 완료하지 못했어요" onBack={() => ctx.cancelAnalysis('camera')} />
+        <div className="screen-body analysis-error-screen">
+          <div className="analysis-error-mark"><IconInfo size={28} /></div>
+          <div role="alert" className="analysis-error-card">
+            <h1>사진 분석을 다시 시도해 주세요</h1>
+            <p>{ctx.analysisError}</p>
+          </div>
+          <div className="analysis-error-actions">
+            <Button variant="primary" fullWidth onClick={ctx.retryAnalysis}>다시 시도</Button>
+            <Button variant="outline" fullWidth onClick={() => ctx.cancelAnalysis('camera')}>다시 촬영</Button>
+            <Button variant="ghost" fullWidth onClick={() => ctx.cancelAnalysis('home')}>홈으로</Button>
+          </div>
+          <p className="analysis-privacy-note">실패한 사진은 재시도를 선택한 동안에만 메모리에 남습니다.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="screen anim-fade" style={{
@@ -86,19 +84,14 @@ function ScreenAnalyzing({ ctx, nav }) {
         {/* progress bar */}
         <div style={{ marginTop: 32, padding: '0 4px' }}>
           <div style={{ height: 4, background: 'var(--line)', borderRadius: 9999, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', width: `${progress}%`,
-              background: 'var(--accent-strong)',
-              borderRadius: 9999,
-              transition: 'width 100ms linear',
-            }} />
+            <div className="analysis-progress-indeterminate" />
           </div>
           <div style={{
             display: 'flex', justifyContent: 'space-between', marginTop: 8,
             fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)',
           }}>
-            <span>{String(Math.floor(progress)).padStart(3, '0')}%</span>
-            <span>예상 시간 3초</span>
+            <span>MODEL + ENVIRONMENT</span>
+            <span>최대 60초</span>
           </div>
         </div>
 
@@ -138,7 +131,8 @@ function ScreenAnalyzing({ ctx, nav }) {
 
         <div style={{ flex: 1, minHeight: 16 }} />
         <div style={{ textAlign: 'center', padding: '20px 0 10px' }}>
-          <div className="t-small">조치원읍 환경 데이터 · 30분 캐시</div>
+          <div className="t-small">사진은 메모리에서 분석 후 즉시 폐기됩니다.</div>
+          <button type="button" className="analysis-cancel" onClick={() => ctx.cancelAnalysis('camera')}>분석 취소</button>
         </div>
       </div>
     </div>
@@ -165,6 +159,21 @@ function ScreenResult({ ctx, nav }) {
   const analysis = ctx.lastAnalysis || SKIN_ANALYSIS;
   const env = ctx.env;
   const message = ctx.recommend?.message || analysis.message;   // 백엔드 메시지 우선, 없으면 mock  
+
+  if (analysis?.mainRisk) {
+    return (
+      <div className="screen anim-slide-r">
+        <NavTop onBack={() => nav.go('home')} title="분석 결과" />
+        <div className="screen-body" style={{ padding: 20 }}>
+          <Card>
+            <div className="t-tiny">실제 모델 분석 완료</div>
+            <div className="h-title" style={{ marginTop: 8 }}>{analysis.mainRisk.label_ko}</div>
+            <div className="t-body" style={{ marginTop: 6 }}>위험 확률 {analysis.mainRisk.risk_score}%</div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="screen anim-slide-r">
