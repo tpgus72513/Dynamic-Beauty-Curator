@@ -102,6 +102,33 @@ it('maps browser camera errors to actionable Korean guidance', () => {
 
 
 describe('camera screen lifecycle', () => {
+  it('keeps capture disabled until the video has usable dimensions', async () => {
+    const stream = { getTracks: () => [{ stop: vi.fn() }] }
+    const getUserMedia = vi.fn().mockResolvedValue(stream)
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia },
+    })
+
+    const { container } = render(createElement(ScreenCamera, {
+      ctx: { startAnalysis: vi.fn() },
+      nav: { go: vi.fn() },
+    }))
+    const video = container.querySelector('video')
+    const shutter = screen.getByRole('button', { name: '얼굴 사진 촬영' })
+
+    await waitFor(() => expect(video.srcObject).toBe(stream))
+    expect(shutter).toBeDisabled()
+    expect(screen.getByText('카메라 화면 준비 중')).toBeVisible()
+
+    Object.defineProperty(video, 'videoWidth', { configurable: true, value: 640 })
+    Object.defineProperty(video, 'videoHeight', { configurable: true, value: 480 })
+    fireEvent.loadedMetadata(video)
+
+    await waitFor(() => expect(shutter).toBeEnabled())
+    expect(screen.getByText('카메라 준비 완료')).toBeVisible()
+  })
+
   it('opens the camera and stops its track on unmount', async () => {
     const stop = vi.fn()
     const stream = { getTracks: () => [{ stop }] }

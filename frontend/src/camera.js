@@ -18,6 +18,46 @@ export function stopMediaStream(stream) {
 }
 
 
+export function waitForVideoReady(video, { signal, timeoutMs = 8000 } = {}) {
+  const hasDimensions = () => Boolean(video?.videoWidth && video?.videoHeight)
+  if (hasDimensions()) return Promise.resolve()
+
+  return new Promise((resolve, reject) => {
+    let timeoutId
+    const events = ['loadedmetadata', 'canplay', 'resize']
+    const cleanup = () => {
+      clearTimeout(timeoutId)
+      events.forEach(event => video?.removeEventListener?.(event, checkReady))
+      signal?.removeEventListener?.('abort', handleAbort)
+    }
+    const finish = (callback, value) => {
+      cleanup()
+      callback(value)
+    }
+    const checkReady = () => {
+      if (hasDimensions()) finish(resolve)
+    }
+    const handleAbort = () => {
+      const error = new Error('카메라 준비가 취소되었습니다.')
+      error.name = 'AbortError'
+      finish(reject, error)
+    }
+
+    if (signal?.aborted) {
+      handleAbort()
+      return
+    }
+
+    events.forEach(event => video?.addEventListener?.(event, checkReady))
+    signal?.addEventListener?.('abort', handleAbort, { once: true })
+    timeoutId = setTimeout(() => {
+      finish(reject, new Error('카메라 화면 준비 시간이 초과되었습니다. 다시 시도해 주세요.'))
+    }, timeoutMs)
+    checkReady()
+  })
+}
+
+
 export function captureVideoFrame(video, canvas = document.createElement('canvas')) {
   const width = video?.videoWidth || 0
   const height = video?.videoHeight || 0

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 
 import { ScreenHome, ScreenOnboarding } from './screens-1-4'
@@ -68,4 +68,53 @@ it('lets the user cancel a pending browser permission request safely', async () 
 
   expect(screen.getByRole('heading', { name: '카메라 접근 허용' })).toBeVisible()
   expect(set).not.toHaveBeenCalled()
+})
+
+
+it('keeps the location step open with a retry message when permission fails', async () => {
+  const requestLocation = vi.fn().mockResolvedValue(false)
+  render(<ScreenOnboarding
+    ctx={{ permissions: {}, set: vi.fn(), requestLocation }}
+    nav={{ go: vi.fn() }}
+  />)
+
+  fireEvent.click(screen.getByRole('button', { name: '시작하기' }))
+  fireEvent.click(screen.getByRole('button', { name: '허용하기' }))
+
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: '위치 정보 허용' })).toBeVisible()
+    expect(screen.getByRole('alert')).toHaveTextContent('현재 위치를 가져오지 못했어요')
+  })
+  expect(screen.getByRole('button', { name: '다시 시도' })).toBeEnabled()
+  expect(screen.queryByRole('heading', { name: '카메라 접근 허용' })).not.toBeInTheDocument()
+})
+
+
+it('shows whether device location is connected and lets returning users reconnect', () => {
+  const requestLocation = vi.fn()
+  const env = {
+    region: '환경 데이터 대기 중',
+    updatedAt: '업데이트 대기 중',
+    source: 'demo',
+    pm25: { value: 22, label: '좋음', level: 'good', unit: '㎍/㎥' },
+    uv: { value: 3, label: '낮음', level: 'good', unit: 'UVI' },
+    water: { value: '양호', label: '양호', level: 'good', unit: '' },
+  }
+  const { rerender } = render(<ScreenHome ctx={{
+    user: { nickname: '민지' }, env, recStatus: 'error',
+    location: { lat: 36.62, lng: 127.29, source: 'demo' },
+    locationStatus: 'idle', requestLocation,
+  }} nav={{ go: vi.fn() }} />)
+
+  fireEvent.click(screen.getByRole('button', { name: '현재 위치 연결' }))
+  expect(requestLocation).toHaveBeenCalledOnce()
+
+  rerender(<ScreenHome ctx={{
+    user: { nickname: '민지' }, env, recStatus: 'error',
+    location: { lat: 37.5665, lng: 126.978, source: 'device' },
+    locationStatus: 'ready', requestLocation,
+  }} nav={{ go: vi.fn() }} />)
+
+  expect(screen.getByRole('button', { name: /현재 위치 연결됨/ })).toBeVisible()
+  expect(screen.getByText('37.5665, 126.9780')).toBeVisible()
 })

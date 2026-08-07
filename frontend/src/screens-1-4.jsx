@@ -15,6 +15,7 @@ import {
   requestUserCamera,
   stopMediaStream,
   validateSelectedImage,
+  waitForVideoReady,
 } from './camera';
 
 // ═══════════════════════════════════════════════════════════
@@ -24,12 +25,14 @@ function ScreenOnboarding({ ctx, nav }) {
   const [step, setStep] = React.useState(0); // 0: intro, 1: location, 2: camera
   const [perms, setPerms] = React.useState(ctx.permissions);
   const [permissionPending, setPermissionPending] = React.useState(false);
+  const [permissionError, setPermissionError] = React.useState('');
   const permissionRequestRef = React.useRef(0);
 
   const grant = async (key) => {
     if (permissionPending) return;
     const requestId = ++permissionRequestRef.current;
     setPermissionPending(true);
+    setPermissionError('');
     let granted = true;
     if (key === 'location' && ctx.requestLocation) {
       granted = await ctx.requestLocation();
@@ -41,6 +44,12 @@ function ScreenOnboarding({ ctx, nav }) {
     setPerms(next);
     ctx.set({ permissions: next });
     setPermissionPending(false);
+    if (!granted) {
+      setPermissionError(key === 'location'
+        ? '현재 위치를 가져오지 못했어요. 브라우저 권한을 확인하고 다시 시도해 주세요.'
+        : '카메라 권한을 확인하지 못했어요. 브라우저 권한을 확인하고 다시 시도해 주세요.');
+      return;
+    }
     setStep(s => s + 1);
   };
   const cancelPendingPermission = () => {
@@ -51,6 +60,7 @@ function ScreenOnboarding({ ctx, nav }) {
   };
   const skip = () => {
     cancelPendingPermission();
+    setPermissionError('');
     setStep(s => s + 1);
   };
 
@@ -152,6 +162,20 @@ function ScreenOnboarding({ ctx, nav }) {
               : '사진은 분석 중 백엔드 메모리에서만 처리하며 지속적으로 저장하지 않습니다.'}
           </div>
         </div>
+        {permissionError && (
+          <div role="alert" style={{
+            marginTop: 14, padding: 14, borderRadius: 14,
+            background: 'oklch(0.97 0.025 25)', color: 'var(--status-vbad)',
+            fontSize: 13, lineHeight: 1.5,
+          }}>
+            <div>{permissionError}</div>
+            <button type="button" onClick={() => grant(data.key)} style={{
+              marginTop: 8, padding: '7px 11px', borderRadius: 9999,
+              border: '1px solid currentColor', background: 'transparent',
+              color: 'inherit', fontSize: 12, fontWeight: 700,
+            }}>다시 시도</button>
+          </div>
+        )}
       </div>
       <BottomCTA>
         <Button onClick={() => grant(data.key)} variant="primary" size="xl" fullWidth disabled={permissionPending}>
@@ -276,6 +300,16 @@ function ScreenHome({ ctx, nav }) {
   const valueColor = statusHues[level];
   const displayRegion = env?.region || '위치 정보 없음';
   const displayUpdatedAt = env?.updatedAt || '업데이트 대기 중';
+  const locationConnected = ctx.locationStatus === 'ready' && ctx.location?.source === 'device';
+  const locationRequesting = ctx.locationStatus === 'requesting';
+  const locationFailed = ['error', 'unsupported'].includes(ctx.locationStatus);
+  const locationLabel = locationConnected
+    ? '현재 위치 연결됨'
+    : locationRequesting ? '현재 위치 확인 중…'
+      : locationFailed ? '위치 연결 실패 · 다시 시도' : '현재 위치 연결';
+  const coordinateLabel = locationConnected
+    ? `${Number(ctx.location.lat).toFixed(4)}, ${Number(ctx.location.lng).toFixed(4)}`
+    : null;
   const todayLabel = new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
   }).format(new Date());
@@ -313,6 +347,37 @@ function ScreenHome({ ctx, nav }) {
       </div>
 
       <div className="screen-body" style={{ position: 'relative' }}>
+        {ctx.requestLocation && (
+          <div style={{ padding: '6px 20px 0' }}>
+            <button
+              type="button"
+              aria-label={locationConnected ? `${locationLabel} ${coordinateLabel}` : locationLabel}
+              disabled={locationRequesting}
+              onClick={() => ctx.requestLocation()}
+              style={{
+                width: '100%', padding: '10px 12px', borderRadius: 14,
+                border: '1px solid var(--line)', background: 'var(--bg-elev)',
+                display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left',
+                color: 'var(--ink)', opacity: locationRequesting ? 0.65 : 1,
+                cursor: locationRequesting ? 'wait' : 'pointer',
+              }}
+            >
+              <span style={{
+                width: 30, height: 30, borderRadius: 10, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: locationConnected ? 'var(--accent-soft)' : 'var(--bg-sunken)',
+                color: locationConnected ? 'var(--accent-strong)' : 'var(--ink-3)',
+              }}><IconLocation size={16}/></span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>{locationLabel}</span>
+                <span style={{ display: 'block', marginTop: 1, fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                  {coordinateLabel || '환경 추천에 사용할 기기 좌표를 다시 확인합니다.'}
+                </span>
+              </span>
+              <IconRefresh size={14}/>
+            </button>
+          </div>
+        )}
         {/* map block + integrated controls */}
         <div style={{ padding: '14px 20px 0' }}>
           <div style={{
@@ -523,6 +588,7 @@ function SecondaryButton({ icon, label, desc, onClick }) {
 function ScreenCamera({ ctx, nav }) {
   const videoRef = React.useRef(null);
   const streamRef = React.useRef(null);
+  const videoReadyControllerRef = React.useRef(null);
   const fileRef = React.useRef(null);
   const mountedRef = React.useRef(false);
   const submittingRef = React.useRef(false);
@@ -533,6 +599,7 @@ function ScreenCamera({ ctx, nav }) {
 
   const openCamera = React.useCallback(async () => {
     const requestId = ++cameraRequestRef.current;
+    videoReadyControllerRef.current?.abort();
     stopMediaStream(streamRef.current);
     streamRef.current = null;
     setCameraStatus('opening');
@@ -544,7 +611,17 @@ function ScreenCamera({ ctx, nav }) {
         return;
       }
       streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
+      const video = videoRef.current;
+      if (!video) {
+        stopMediaStream(stream);
+        throw new Error('카메라 화면을 찾지 못했습니다.');
+      }
+      video.srcObject = stream;
+      setCameraStatus('preparing');
+      const readyController = new AbortController();
+      videoReadyControllerRef.current = readyController;
+      await waitForVideoReady(video, { signal: readyController.signal });
+      if (!mountedRef.current || submittingRef.current || requestId !== cameraRequestRef.current) return;
       setCameraStatus('ready');
     } catch (error) {
       if (!mountedRef.current || submittingRef.current || requestId !== cameraRequestRef.current) return;
@@ -559,6 +636,8 @@ function ScreenCamera({ ctx, nav }) {
     return () => {
       mountedRef.current = false;
       cameraRequestRef.current += 1;
+      videoReadyControllerRef.current?.abort();
+      videoReadyControllerRef.current = null;
       stopMediaStream(streamRef.current);
       streamRef.current = null;
     };
@@ -567,6 +646,8 @@ function ScreenCamera({ ctx, nav }) {
   const submitImage = React.useCallback((image) => {
     submittingRef.current = true;
     cameraRequestRef.current += 1;
+    videoReadyControllerRef.current?.abort();
+    videoReadyControllerRef.current = null;
     stopMediaStream(streamRef.current);
     streamRef.current = null;
     if (ctx.startAnalysis) {
@@ -605,6 +686,8 @@ function ScreenCamera({ ctx, nav }) {
   const closeCamera = () => {
     submittingRef.current = true;
     cameraRequestRef.current += 1;
+    videoReadyControllerRef.current?.abort();
+    videoReadyControllerRef.current = null;
     stopMediaStream(streamRef.current);
     streamRef.current = null;
     nav.go('home');
@@ -638,7 +721,10 @@ function ScreenCamera({ ctx, nav }) {
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
           <span style={{ width: 6, height: 6, borderRadius: 9999, background: 'oklch(0.7 0.18 30)', animation: 'breathe 1.5s ease-in-out infinite' }}/>
-          {cameraStatus === 'ready' ? '카메라 준비 완료' : cameraStatus === 'opening' ? '카메라 여는 중' : '확인 필요'}
+          {cameraStatus === 'ready'
+            ? '카메라 준비 완료'
+            : cameraStatus === 'preparing' ? '카메라 화면 준비 중'
+              : cameraStatus === 'opening' ? '카메라 여는 중' : '확인 필요'}
         </div>
         <button type="button" aria-label="카메라 다시 시도" onClick={openCamera} style={{
           width: 40, height: 40, borderRadius: 9999, background: 'rgba(0,0,0,0.5)',
