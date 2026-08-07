@@ -1,7 +1,5 @@
 // src/api/adapters.js
 // 백엔드 /recommend 의 env_data → 프론트 env 모양으로 변환
-import { ENV_DATA } from '../data';
-
 // 등급 문자열 → level (색칠용: good | mid | bad | vbad)
 const PM25_LEVEL  = { '좋음': 'good', '보통': 'mid', '나쁨': 'bad', '매우나쁨': 'vbad' };
 const UV_LEVEL    = { '낮음': 'good', '보통': 'mid', '높음': 'bad', '매우높음': 'vbad', '위험': 'vbad' };
@@ -14,16 +12,16 @@ function toLevel(map, grade) {
   return level ?? 'mid';
 }
 
-export function adaptEnvData(apiEnv) {
+export function adaptEnvData(apiEnv, isFallback = false) {
   const updatedAt = new Intl.DateTimeFormat('ko-KR', {
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date());
 
   return {
-    ...ENV_DATA, // 백엔드에 없는 필드(fullRegion/updatedAt/temp/humidity 등)는 mock 기본값 유지
-    region: apiEnv.region ?? ENV_DATA.region,
-    fullRegion: apiEnv.region ?? ENV_DATA.fullRegion,
+    source: isFallback ? 'fallback' : 'live',
+    region: apiEnv.region ?? '위치 정보 없음',
+    fullRegion: apiEnv.region ?? '위치 정보 없음',
     updatedAt,
     pm25:  { value: apiEnv.pm25,  label: apiEnv.pm25_grade, level: toLevel(PM25_LEVEL, apiEnv.pm25_grade), unit: '㎍/㎥' },
     uv:    { value: apiEnv.uv,    label: apiEnv.uv_grade,   level: toLevel(UV_LEVEL,   apiEnv.uv_grade),   unit: 'UVI' },

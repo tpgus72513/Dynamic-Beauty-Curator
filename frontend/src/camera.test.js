@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -139,6 +139,8 @@ describe('camera screen lifecycle', () => {
     }))
     const file = new File(['image'], 'face.png', { type: 'image/png' })
 
+    expect(screen.getByLabelText('사진 파일 선택')).not.toHaveAttribute('capture')
+
     fireEvent.change(screen.getByLabelText('사진 파일 선택'), {
       target: { files: [file] },
     })
@@ -148,5 +150,38 @@ describe('camera screen lifecycle', () => {
     expect(screen.getByText(/백엔드로 전송/)).toBeVisible()
     expect(screen.getByText(/메모리/)).toBeVisible()
     expect(screen.getByText(/의료 진단/)).toBeVisible()
+  })
+
+  it('stops a stale stream when overlapping camera requests resolve out of order', async () => {
+    let resolveFirst
+    let resolveSecond
+    const firstStop = vi.fn()
+    const secondStop = vi.fn()
+    const firstStream = { getTracks: () => [{ stop: firstStop }] }
+    const secondStream = { getTracks: () => [{ stop: secondStop }] }
+    const getUserMedia = vi.fn()
+      .mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve }))
+      .mockImplementationOnce(() => new Promise(resolve => { resolveSecond = resolve }))
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia },
+    })
+
+    const { container, unmount } = render(createElement(ScreenCamera, {
+      ctx: { startAnalysis: vi.fn() },
+      nav: { go: vi.fn() },
+    }))
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledOnce())
+    fireEvent.click(screen.getByRole('button', { name: '카메라 다시 시도' }))
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(2))
+
+    await act(async () => resolveSecond(secondStream))
+    await waitFor(() => expect(container.querySelector('video').srcObject).toBe(secondStream))
+    await act(async () => resolveFirst(firstStream))
+
+    expect(firstStop).toHaveBeenCalledOnce()
+    expect(container.querySelector('video').srcObject).toBe(secondStream)
+    unmount()
+    expect(secondStop).toHaveBeenCalledOnce()
   })
 })

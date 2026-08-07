@@ -1,7 +1,8 @@
 # 백엔드 서버에 필요한 라이브러리
 # 설치: pip install -r requirements.txt
 
-fastapi==0.115.0          # API 서버 프레임워크
+fastapi==0.116.1          # API 서버 프레임워크
+starlette==0.47.2         # patched multipart/request handling baseline
 uvicorn==0.30.6           # FastAPI를 실행하는 웹 서버
 pydantic==2.9.2           # 요청/응답 데이터 검증
 requests==2.32.3          # 외부 API(기상청·에어코리아) 호출용
@@ -12,6 +13,6 @@ tensorflow==2.17.1
 keras==3.14.1
 numpy>=1.24,<2.0
 Pillow>=10.4,<12.0
-python-multipart>=0.0.9,<1.0
+python-multipart==0.0.32  # bounded parser APIs and current multipart security fixes
 pytest>=8.3,<9.0
 httpx>=0.27,<1.0

@@ -8,7 +8,7 @@ import {
   IconHistory, IconInfo, IconLocation, IconRefresh, IconShield, IconSparkle, IconUser,
 } from './icons';
 import { SKIN_TYPES, CONCERNS } from './data';
-import { KoreaMap, MapLegend, LAYERS, KOREA_REGIONS } from './korea-map';
+import { KoreaMap, MapLegend, LAYERS } from './korea-map';
 import {
   cameraErrorMessage,
   captureVideoFrame,
@@ -23,20 +23,41 @@ import {
 function ScreenOnboarding({ ctx, nav }) {
   const [step, setStep] = React.useState(0); // 0: intro, 1: location, 2: camera
   const [perms, setPerms] = React.useState(ctx.permissions);
+  const [permissionPending, setPermissionPending] = React.useState(false);
+  const permissionRequestRef = React.useRef(0);
 
   const grant = async (key) => {
+    if (permissionPending) return;
+    const requestId = ++permissionRequestRef.current;
+    setPermissionPending(true);
     let granted = true;
     if (key === 'location' && ctx.requestLocation) {
       granted = await ctx.requestLocation();
     } else if (key === 'camera' && ctx.requestCameraPermission) {
       granted = await ctx.requestCameraPermission();
     }
+    if (permissionRequestRef.current !== requestId) return;
     const next = { ...perms, [key]: granted };
     setPerms(next);
     ctx.set({ permissions: next });
-    setTimeout(() => setStep(s => s + 1), 350);
+    setPermissionPending(false);
+    setStep(s => s + 1);
   };
-  const skip = () => setStep(s => s + 1);
+  const cancelPendingPermission = () => {
+    if (!permissionPending) return;
+    permissionRequestRef.current += 1;
+    ctx.cancelPermissionRequests?.();
+    setPermissionPending(false);
+  };
+  const skip = () => {
+    cancelPendingPermission();
+    setStep(s => s + 1);
+  };
+
+  React.useEffect(() => () => {
+    permissionRequestRef.current += 1;
+    ctx.cancelPermissionRequests?.();
+  }, [ctx.cancelPermissionRequests]);
 
   React.useEffect(() => {
     if (step >= 3) nav.go('skin-setup');
@@ -87,14 +108,17 @@ function ScreenOnboarding({ ctx, nav }) {
   const data = isLoc
     ? { key: 'location', icon: <IconLocation size={36}/>, title: '위치 정보 허용',
         body: '오늘 우리 동네의 미세먼지·자외선·수질을 실시간으로 확인합니다.',
-        bullets: ['행정동 단위 환경 데이터', '저장하지 않고 추천에만 사용', '언제든지 끌 수 있어요'] }
+        bullets: ['현재 좌표를 추천 백엔드로 전송', '추천 후 좌표를 지속적으로 저장하지 않음', '언제든지 끌 수 있어요'] }
     : { key: 'camera', icon: <IconCamera size={36}/>, title: '카메라 접근 허용',
         body: '얼굴 사진으로 오늘의 피부 상태를 분석합니다.',
         bullets: ['5개 피부 위험도 분석', '백엔드 메모리에서만 처리', '즉시 폐기 · 의료 진단 아님'] };
 
   return (
     <div className="screen anim-fade">
-      <NavTop onBack={() => setStep(s => s - 1)} title="" />
+      <NavTop onBack={() => {
+        cancelPendingPermission();
+        setStep(s => s - 1);
+      }} title="" />
       <div className="screen-body" style={{ padding: '20px 28px 0' }}>
         <ProgressDots count={2} current={step - 1}/>
         <div style={{
@@ -123,17 +147,20 @@ function ScreenOnboarding({ ctx, nav }) {
         }}>
           <IconShield size={20} stroke="var(--ink-3)"/>
           <div className="t-small" style={{ flex: 1 }}>
-            비상업적 프로토타입이며 위치는 수집·저장되지 않습니다.
+            {isLoc
+              ? '좌표는 환경 추천 요청에만 사용되며 브라우저나 서버에 지속적으로 저장하지 않습니다.'
+              : '사진은 분석 중 백엔드 메모리에서만 처리하며 지속적으로 저장하지 않습니다.'}
           </div>
         </div>
       </div>
       <BottomCTA>
-        <Button onClick={() => grant(data.key)} variant="primary" size="xl" fullWidth>
-          허용하기
+        <Button onClick={() => grant(data.key)} variant="primary" size="xl" fullWidth disabled={permissionPending}>
+          {permissionPending ? '권한 확인 중…' : '허용하기'}
         </Button>
         <button onClick={skip} style={{
           height: 48, width: '100%', marginTop: 6, background: 'transparent',
           border: 'none', color: 'var(--ink-3)', fontSize: 14, fontWeight: 500,
+          cursor: 'pointer',
         }}>나중에 설정하기</button>
       </BottomCTA>
     </div>
@@ -230,15 +257,28 @@ function ScreenSkinSetup({ ctx, nav }) {
 // ═══════════════════════════════════════════════════════════
 function ScreenHome({ ctx, nav }) {
   const env = ctx.env;
+  const activeRecommendation = ctx.lastAnalysis
+    ? ctx.recommend
+    : (ctx.homeRecommend ?? ctx.recommend);
   const [layer, setLayer] = React.useState('pm25');
-  const [region, setRegion] = React.useState('chungbuk');
 
   const layerCfg = LAYERS[layer];
-  const regionData = KOREA_REGIONS.find(r => r.id === region);
-  const value = layerCfg.valueOf(regionData);
+  const currentRegionValues = {
+    pm25: env?.pm25?.value,
+    uv: env?.uv?.value,
+    water: env?.water?.level === 'good'
+      ? 'good'
+      : ['bad', 'vbad'].includes(env?.water?.level) ? 'bad' : 'mid',
+  };
+  const value = currentRegionValues[layer];
   const level = layerCfg.levelOf(value);
   const statusHues = ['var(--status-good)', 'var(--status-mid)', 'var(--status-bad)', 'var(--status-vbad)'];
   const valueColor = statusHues[level];
+  const displayRegion = env?.region || '위치 정보 없음';
+  const displayUpdatedAt = env?.updatedAt || '업데이트 대기 중';
+  const todayLabel = new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
+  }).format(new Date());
 
   return (
     <div className="screen">
@@ -255,7 +295,7 @@ function ScreenHome({ ctx, nav }) {
       <div style={{ padding: '8px 22px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
         <div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.06em' }}>
-            2026 . 05 . 21  THU
+            {todayLabel}
           </div>
           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)', marginTop: 4, letterSpacing: '-0.025em' }}>
             {ctx.user?.nickname || '고객'}님,<br/>
@@ -297,10 +337,10 @@ function ScreenHome({ ctx, nav }) {
                 }}/>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.02em' }}>
-                    {regionData.name}
+                    {displayRegion}
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>
-                    {layerCfg.label.toUpperCase()} · 07:32
+                    {layerCfg.label.toUpperCase()} · {displayUpdatedAt}
                   </div>
                 </div>
               </div>
@@ -327,7 +367,7 @@ function ScreenHome({ ctx, nav }) {
                 const L = LAYERS[k];
                 const active = layer === k;
                 return (
-                  <button key={k} onClick={() => setLayer(k)} style={{
+                  <button key={k} type="button" aria-pressed={active} onClick={() => setLayer(k)} style={{
                     flex: 1,
                     padding: '9px 8px',
                     background: active ? 'var(--accent-soft)' : 'transparent',
@@ -350,15 +390,18 @@ function ScreenHome({ ctx, nav }) {
 
             {/* map */}
             <div style={{ position: 'relative', paddingBottom: 8 }}>
-              <KoreaMap activeLayer={layer} selectedRegion={region}
-                currentLocation="chungbuk"
-                onSelectRegion={setRegion} height={340}/>
+              <KoreaMap activeLayer={layer} height={340}/>
             </div>
           </div>
 
           {/* legend — outside card, beneath, centered */}
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
             <MapLegend activeLayer={layer}/>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: 5, fontSize: 10, color: 'var(--ink-3)' }}>
+            상단 현재 위치는 {env?.source === 'live'
+              ? '환경 API 값'
+              : env?.source === 'fallback' ? 'fallback 값' : '데모 값'} · 전국 지도 색상은 데모 비교용
           </div>
 
           {/* brief copy */}
@@ -396,7 +439,7 @@ function ScreenHome({ ctx, nav }) {
               )}
               {ctx.recStatus === 'ok' && (
                 <>
-                  {ctx.recommend?.is_fallback && (
+                  {activeRecommendation?.is_fallback && (
                     <span style={{
                       display: 'inline-block', marginBottom: 6,
                       padding: '2px 8px', borderRadius: 9999,
@@ -405,7 +448,7 @@ function ScreenHome({ ctx, nav }) {
                       fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
                     }}>데모 데이터</span>
                   )}
-                  <div>{ctx.recommend?.message || '오늘의 추천을 확인해보세요.'}</div>
+                  <div>{activeRecommendation?.message || '오늘의 추천을 확인해보세요.'}</div>
                 </>
               )}
             </div>
@@ -483,18 +526,20 @@ function ScreenCamera({ ctx, nav }) {
   const fileRef = React.useRef(null);
   const mountedRef = React.useRef(false);
   const submittingRef = React.useRef(false);
+  const cameraRequestRef = React.useRef(0);
   const [capturing, setCapturing] = React.useState(false);
   const [cameraStatus, setCameraStatus] = React.useState('opening');
   const [cameraError, setCameraError] = React.useState('');
 
   const openCamera = React.useCallback(async () => {
+    const requestId = ++cameraRequestRef.current;
     stopMediaStream(streamRef.current);
     streamRef.current = null;
     setCameraStatus('opening');
     setCameraError('');
     try {
       const stream = await requestUserCamera();
-      if (!mountedRef.current || submittingRef.current) {
+      if (!mountedRef.current || submittingRef.current || requestId !== cameraRequestRef.current) {
         stopMediaStream(stream);
         return;
       }
@@ -502,7 +547,7 @@ function ScreenCamera({ ctx, nav }) {
       if (videoRef.current) videoRef.current.srcObject = stream;
       setCameraStatus('ready');
     } catch (error) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || submittingRef.current || requestId !== cameraRequestRef.current) return;
       setCameraStatus('error');
       setCameraError(cameraErrorMessage(error));
     }
@@ -513,6 +558,7 @@ function ScreenCamera({ ctx, nav }) {
     openCamera();
     return () => {
       mountedRef.current = false;
+      cameraRequestRef.current += 1;
       stopMediaStream(streamRef.current);
       streamRef.current = null;
     };
@@ -520,6 +566,7 @@ function ScreenCamera({ ctx, nav }) {
 
   const submitImage = React.useCallback((image) => {
     submittingRef.current = true;
+    cameraRequestRef.current += 1;
     stopMediaStream(streamRef.current);
     streamRef.current = null;
     if (ctx.startAnalysis) {
@@ -557,6 +604,7 @@ function ScreenCamera({ ctx, nav }) {
 
   const closeCamera = () => {
     submittingRef.current = true;
+    cameraRequestRef.current += 1;
     stopMediaStream(streamRef.current);
     streamRef.current = null;
     nav.go('home');
@@ -657,7 +705,6 @@ function ScreenCamera({ ctx, nav }) {
             hidden
             aria-label="사진 파일 선택"
             accept="image/jpeg,image/png,image/webp"
-            capture="user"
             onChange={chooseFile}
           />
           <button
@@ -680,14 +727,14 @@ function ScreenCamera({ ctx, nav }) {
               transition: 'transform 220ms',
             }}/>
           </button>
-          <button type="button" aria-label="촬영 안내" style={{
+          <div aria-hidden="true" style={{
             width: 52, height: 52, borderRadius: 9999, background: 'rgba(255,255,255,0.12)',
             backdropFilter: 'blur(10px)',
             border: 'none', color: '#fff',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <IconInfo size={20}/>
-          </button>
+          </div>
         </div>
       </div>
     </div>

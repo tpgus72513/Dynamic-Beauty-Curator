@@ -1,6 +1,22 @@
 import { expect, it } from 'vitest'
 
-import { adaptSkinAnalysis } from './adapters'
+import { adaptEnvData, adaptSkinAnalysis } from './adapters'
+
+
+it('does not mix mock temperature or humidity into API environment data', () => {
+  const view = adaptEnvData({
+    region: '테스트동',
+    pm25: 13,
+    pm25_grade: '좋음',
+    uv: 1,
+    uv_grade: '낮음',
+    water: '양호',
+  })
+
+  expect(view).toMatchObject({ region: '테스트동', source: 'live' })
+  expect(view.temp).toBeUndefined()
+  expect(view.humidity).toBeUndefined()
+})
 
 
 it('maps model metrics into canonical display order and focus references', () => {

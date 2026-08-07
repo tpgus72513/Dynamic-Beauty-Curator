@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import App from './App'
@@ -100,6 +100,49 @@ it('stores a successful analysis and opens the result route', async () => {
 })
 
 
+it('does not let an older environment recommendation overwrite analysis personalization', async () => {
+  let resolveOldRecommendation
+  apiMocks.getRecommend.mockImplementationOnce(() => new Promise((resolve) => {
+    resolveOldRecommendation = resolve
+  }))
+  apiMocks.analyzeSkin.mockResolvedValue(analysisResponse())
+
+  render(<App />)
+  await waitFor(() => expect(apiMocks.getRecommend).toHaveBeenCalledTimes(1))
+  selectImage()
+  expect(await screen.findByText('민지님은 건조와 민감 관리가 필요해요.')).toBeVisible()
+
+  await act(async () => {
+    resolveOldRecommendation({
+      ...analysisResponse(),
+      message: '오래된 환경 추천이 결과를 덮었습니다.',
+    })
+    await Promise.resolve()
+  })
+
+  expect(screen.queryByText('오래된 환경 추천이 결과를 덮었습니다.')).not.toBeInTheDocument()
+  expect(screen.getByText('민지님은 건조와 민감 관리가 필요해요.')).toBeVisible()
+})
+
+
+it('requires a new analysis after the skin profile changes', async () => {
+  apiMocks.analyzeSkin.mockResolvedValue(analysisResponse())
+  render(<App />)
+  selectImage()
+  expect(await screen.findByText('분석 결과')).toBeVisible()
+
+  fireEvent.click(screen.getByRole('button', { name: '뒤로' }))
+  fireEvent.click(screen.getByRole('button', { name: '마이 페이지' }))
+  fireEvent.click(screen.getByText('피부 타입'))
+  fireEvent.click(screen.getByText('지성', { exact: true }).closest('[role="button"]'))
+  fireEvent.click(screen.getByRole('button', { name: '시작하기' }))
+  fireEvent.click(screen.getByRole('button', { name: /저장한 추천/ }))
+
+  expect(screen.getByText('피부 분석이 먼저 필요해요')).toBeVisible()
+  expect(screen.queryByText('민지님은 건조와 민감 관리가 필요해요.')).not.toBeInTheDocument()
+})
+
+
 it('keeps a failed image in memory for a visible retry', async () => {
   apiMocks.analyzeSkin
     .mockRejectedValueOnce(new Error('모델 연결에 실패했습니다.'))
@@ -112,6 +155,47 @@ it('keeps a failed image in memory for a visible retry', async () => {
 
   expect(await screen.findByText('분석 결과')).toBeVisible()
   expect(apiMocks.analyzeSkin).toHaveBeenCalledTimes(2)
+})
+
+
+it('restarts the home recommendation after a failed analysis is cancelled', async () => {
+  apiMocks.getRecommend
+    .mockImplementationOnce(() => new Promise(() => {}))
+    .mockResolvedValueOnce({
+      ...analysisResponse(),
+      message: '홈 추천 연결이 복구됐어요.',
+    })
+  apiMocks.analyzeSkin.mockRejectedValue(new Error('모델 연결에 실패했습니다.'))
+
+  render(<App />)
+  await waitFor(() => expect(apiMocks.getRecommend).toHaveBeenCalledTimes(1))
+  selectImage()
+  expect(await screen.findByRole('alert')).toHaveTextContent('모델 연결에 실패했습니다.')
+  fireEvent.click(screen.getByRole('button', { name: '홈으로' }))
+
+  expect(await screen.findByText('홈 추천 연결이 복구됐어요.')).toBeVisible()
+  expect(apiMocks.getRecommend).toHaveBeenCalledTimes(2)
+})
+
+
+it('keeps the restarted home recommendation after recapture is closed', async () => {
+  apiMocks.getRecommend
+    .mockImplementationOnce(() => new Promise(() => {}))
+    .mockResolvedValueOnce({
+      ...analysisResponse(),
+      message: '재촬영 뒤에도 홈 추천이 보여요.',
+    })
+  apiMocks.analyzeSkin.mockRejectedValue(new Error('모델 연결에 실패했습니다.'))
+
+  render(<App />)
+  await waitFor(() => expect(apiMocks.getRecommend).toHaveBeenCalledTimes(1))
+  selectImage()
+  expect(await screen.findByRole('alert')).toHaveTextContent('모델 연결에 실패했습니다.')
+  fireEvent.click(screen.getByRole('button', { name: '다시 촬영' }))
+  fireEvent.click(screen.getByRole('button', { name: '카메라 닫기' }))
+
+  expect(await screen.findByText('재촬영 뒤에도 홈 추천이 보여요.')).toBeVisible()
+  expect(apiMocks.getRecommend).toHaveBeenCalledTimes(2)
 })
 
 
@@ -131,4 +215,41 @@ it('aborts after sixty seconds and lets the user return home', async () => {
   expect(screen.getByRole('alert')).toHaveTextContent('시간이 초과')
   fireEvent.click(screen.getByRole('button', { name: '홈으로' }))
   expect(screen.getByText(/민지님/)).toBeVisible()
+})
+
+
+it('clears the previous profile and ignores its in-flight recommendation after logout', async () => {
+  let resolveOldRecommendation
+  apiMocks.getRecommend
+    .mockImplementationOnce(() => new Promise((resolve) => {
+      resolveOldRecommendation = resolve
+    }))
+    .mockImplementation(() => new Promise(() => {}))
+
+  render(<App />)
+  await waitFor(() => expect(apiMocks.getRecommend).toHaveBeenCalledTimes(1))
+
+  fireEvent.click(screen.getByRole('button', { name: '마이 페이지' }))
+  fireEvent.click(screen.getByRole('button', { name: '로그아웃' }))
+  fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '새봄' } })
+  fireEvent.click(screen.getByRole('button', { name: '계속하기' }))
+
+  fireEvent.click(screen.getByRole('button', { name: '시작하기' }))
+  fireEvent.click(screen.getByRole('button', { name: '나중에 설정하기' }))
+  fireEvent.click(screen.getByRole('button', { name: '나중에 설정하기' }))
+  fireEvent.click(screen.getByRole('button', { name: '시작하기' }))
+
+  await act(async () => {
+    resolveOldRecommendation(analysisResponse())
+    await Promise.resolve()
+  })
+
+  expect(screen.getByText(/새봄님/)).toBeVisible()
+  expect(screen.queryByText('민지님은 건조와 민감 관리가 필요해요.')).not.toBeInTheDocument()
+  expect(screen.getByText('오늘의 추천을 불러오는 중…')).toBeVisible()
+  expect(apiMocks.getRecommend).toHaveBeenLastCalledWith(expect.objectContaining({
+    lat: 36.62,
+    lng: 127.29,
+    skin_type: 'dry_sensitive',
+  }))
 })

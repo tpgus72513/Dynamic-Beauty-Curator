@@ -14,15 +14,20 @@
 
 from datetime import datetime, timezone
 from functools import partial
+import logging
+from threading import BoundedSemaphore
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from anyio import fail_after
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
+from starlette.requests import ClientDisconnect
+from starlette.responses import JSONResponse
 
 from config import check_keys, settings
 from image_upload import (
-    read_limited_upload,
-    validate_content_type,
+    parse_analyze_multipart,
     validate_decodable_image,
 )
 from schemas import AnalyzeResponse, RecommendRequest, RecommendResponse
@@ -36,6 +41,50 @@ from skin_analyzer import (
 import recommender
 
 
+logger = logging.getLogger(__name__)
+
+
+class TrustedBrowserOriginMiddleware:
+    """Reject untrusted browser origins before request bodies are consumed."""
+
+    def __init__(self, app, allowed_origins):
+        self.app = app
+        self.allowed_origins = frozenset(allowed_origins)
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            headers = tuple(scope.get("headers", ()))
+            origins = [
+                value.decode("latin-1").rstrip("/")
+                for name, value in headers
+                if name.lower() == b"origin"
+            ]
+            hosts = [
+                value.decode("latin-1")
+                for name, value in headers
+                if name.lower() == b"host"
+            ]
+            same_origin = (
+                f"{scope.get('scheme', 'http')}://{hosts[0]}"
+                if len(hosts) == 1
+                else None
+            )
+            if origins and (
+                len(origins) != 1
+                or (
+                    origins[0] not in self.allowed_origins
+                    and origins[0] != same_origin
+                )
+            ):
+                response = JSONResponse(
+                    status_code=403,
+                    content={"detail": "허용되지 않은 브라우저 출처입니다."},
+                )
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
 # ------------------------------------------------------------
 # FastAPI 앱 생성
 # ------------------------------------------------------------
@@ -45,15 +94,22 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS 설정: 프론트엔드(다른 주소)에서 이 API를 호출할 수 있게 허용
-# 데모 단계에서는 모두 허용("*"). 실제 서비스에서는 특정 주소만 허용해야 함.
+# The browser client is local-only for now, so no arbitrary origins are trusted.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=list(settings.CORS_ORIGINS),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
+app.add_middleware(
+    TrustedBrowserOriginMiddleware,
+    allowed_origins=settings.CORS_ORIGINS,
+)
+
+_analysis_slots = BoundedSemaphore(settings.MAX_CONCURRENT_ANALYSES)
+_upload_slots = BoundedSemaphore(settings.MAX_CONCURRENT_UPLOADS)
+_recommend_slots = BoundedSemaphore(settings.MAX_CONCURRENT_RECOMMENDATIONS)
 
 
 # ------------------------------------------------------------
@@ -92,11 +148,50 @@ def assemble_analyze_response(analysis: dict, recommendation: dict) -> dict:
     }
 
 
+async def parse_recommend_request(request: Request) -> RecommendRequest:
+    """Read a small JSON recommendation request with a hard byte/time limit."""
+    media_type = request.headers.get("content-type", "").partition(";")[0].strip().lower()
+    if media_type != "application/json":
+        raise HTTPException(status_code=415, detail="application/json 요청이 필요합니다.")
+
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            advertised_size = int(content_length)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Content-Length가 올바르지 않습니다.") from exc
+        if advertised_size < 0:
+            raise HTTPException(status_code=400, detail="Content-Length가 올바르지 않습니다.")
+        if advertised_size > settings.MAX_RECOMMEND_BODY_BYTES:
+            raise HTTPException(status_code=413, detail="추천 요청 본문이 너무 큽니다.")
+
+    body = bytearray()
+    try:
+        with fail_after(settings.RECOMMEND_READ_TIMEOUT_SECONDS):
+            async for chunk in request.stream():
+                if len(body) + len(chunk) > settings.MAX_RECOMMEND_BODY_BYTES:
+                    raise HTTPException(status_code=413, detail="추천 요청 본문이 너무 큽니다.")
+                body.extend(chunk)
+    except HTTPException:
+        raise
+    except TimeoutError as exc:
+        raise HTTPException(status_code=408, detail="추천 요청 시간이 초과되었습니다.") from exc
+    except ClientDisconnect as exc:
+        raise HTTPException(status_code=400, detail="추천 요청 연결이 종료되었습니다.") from exc
+
+    if not body:
+        raise HTTPException(status_code=422, detail="추천 입력값을 확인해 주세요.")
+    try:
+        return RecommendRequest.model_validate_json(bytes(body))
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail="추천 입력값을 확인해 주세요.") from exc
+
+
 # ------------------------------------------------------------
 # 엔드포인트 2: 추천 (이 프로젝트의 핵심)
 # ------------------------------------------------------------
 @app.post("/recommend", response_model=RecommendResponse)
-def recommend_skincare(request: RecommendRequest):
+async def recommend_skincare(request: Request):
     """
     GPS 좌표와 피부 타입을 받아 맞춤형 스킨케어 루틴을 추천한다.
 
@@ -110,63 +205,99 @@ def recommend_skincare(request: RecommendRequest):
     요청 예시:
       { "lat": 36.62, "lng": 127.29, "skin_type": "dry_sensitive" }
     """
-    try:
-        result = recommender.recommend(
-            lat=request.lat,
-            lng=request.lng,
-            skin_type=request.skin_type,
+    payload = await parse_recommend_request(request)
+    if not _recommend_slots.acquire(blocking=False):
+        raise HTTPException(
+            status_code=429,
+            detail="추천 요청이 많습니다. 잠시 후 다시 시도해 주세요.",
+            headers={"Retry-After": "1"},
         )
-        return result
 
-    except Exception as e:
-        # 예상치 못한 에러는 500 에러로 응답
-        print(f"[main] 추천 처리 중 에러: {e}")
+    try:
+        recommend_call = partial(
+            recommender.recommend,
+            lat=payload.lat,
+            lng=payload.lng,
+            skin_type=payload.skin_type,
+        )
+        return await run_in_threadpool(recommend_call)
+    except recommender.EnvironmentServiceError:
+        raise HTTPException(
+            status_code=503,
+            detail="환경 추천 데이터를 사용할 수 없습니다.",
+        ) from None
+    except Exception as exc:
+        logger.error("Recommendation processing failed (type=%s)", type(exc).__name__)
         raise HTTPException(
             status_code=500,
-            detail=f"추천 처리 중 오류가 발생했습니다: {str(e)}",
-        )
+            detail="추천 처리 중 오류가 발생했습니다.",
+        ) from None
+    finally:
+        _recommend_slots.release()
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
-async def analyze_skin(
-    image: UploadFile = File(...),
-    nickname: str = Form(..., min_length=1, max_length=12),
-    lat: float = Form(...),
-    lng: float = Form(...),
-    skin_type: str = Form(...),
-):
+async def analyze_skin(request: Request):
     """Analyze one image in memory and compose a personalized routine."""
-    clean_nickname = nickname.strip()
-    if not clean_nickname or len(clean_nickname) > 12:
+    if not _upload_slots.acquire(blocking=False):
         raise HTTPException(
-            status_code=422,
-            detail="닉네임은 1~12자로 입력해 주세요.",
+            status_code=429,
+            detail="이미지 업로드 요청이 많습니다. 잠시 후 다시 시도해 주세요.",
+            headers={"Retry-After": "1"},
         )
-
-    validate_content_type(image.content_type)
-    image_bytes = await read_limited_upload(image, settings.MAX_IMAGE_BYTES)
-    validate_decodable_image(image_bytes)
 
     try:
-        analysis = await run_in_threadpool(analyze_image, image_bytes)
-        recommend_call = partial(
-            recommender.recommend,
-            lat=lat,
-            lng=lng,
-            skin_type=skin_type,
-            nickname=clean_nickname,
-            skin_analysis=analysis["skin_analysis"],
-        )
-        recommendation = await run_in_threadpool(recommend_call)
-    except ModelUnavailableError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail="피부 분석 모델을 사용할 수 없습니다.",
-        ) from exc
-    except InvalidModelOutputError as exc:
-        raise HTTPException(
-            status_code=500,
-            detail="피부 분석 결과를 확인할 수 없습니다.",
-        ) from exc
+        form = await parse_analyze_multipart(request)
+    finally:
+        _upload_slots.release()
 
-    return assemble_analyze_response(analysis, recommendation)
+    if not _analysis_slots.acquire(blocking=False):
+        raise HTTPException(
+            status_code=429,
+            detail="피부 분석 요청이 많습니다. 잠시 후 다시 시도해 주세요.",
+            headers={"Retry-After": "1"},
+        )
+
+    try:
+        await run_in_threadpool(
+            validate_decodable_image,
+            form.image_bytes,
+            form.image_content_type,
+        )
+
+        try:
+            analysis = await run_in_threadpool(analyze_image, form.image_bytes)
+            recommend_call = partial(
+                recommender.recommend,
+                lat=form.lat,
+                lng=form.lng,
+                skin_type=form.skin_type,
+                nickname=form.nickname,
+                skin_analysis=analysis["skin_analysis"],
+            )
+            recommendation = await run_in_threadpool(recommend_call)
+        except ModelUnavailableError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="피부 분석 모델을 사용할 수 없습니다.",
+            ) from exc
+        except InvalidModelOutputError as exc:
+            raise HTTPException(
+                status_code=500,
+                detail="피부 분석 결과를 확인할 수 없습니다.",
+            ) from exc
+        except recommender.EnvironmentServiceError:
+            raise HTTPException(
+                status_code=503,
+                detail="환경 추천 데이터를 사용할 수 없습니다.",
+            ) from None
+        except Exception as exc:
+            logger.error("Skin analysis processing failed (type=%s)", type(exc).__name__)
+            raise HTTPException(
+                status_code=500,
+                detail="피부 분석 처리 중 오류가 발생했습니다.",
+            ) from None
+
+        return assemble_analyze_response(analysis, recommendation)
+    finally:
+        _analysis_slots.release()

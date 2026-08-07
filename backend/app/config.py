@@ -14,6 +14,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
+LOCAL_CORS_ORIGINS = (
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+)
+
+
+def _read_cors_origins() -> tuple[str, ...]:
+    configured = os.getenv("CORS_ORIGINS", "").strip()
+    if not configured:
+        return LOCAL_CORS_ORIGINS
+    origins = tuple(origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip())
+    if not origins or "*" in origins:
+        raise ValueError("CORS_ORIGINS must be an explicit comma-separated allowlist")
+    return origins
 
 
 class Settings:
@@ -43,6 +59,18 @@ class Settings:
     MODEL_SHA256: str = "E835BB5686FF5C3DDF83BA92D52EB7CB4D2E100D1097178775B08A68F313EB15"
     RISK_RULES_PATH: Path = BACKEND_DIR / "data" / "skin_risk_rules.json"
     MAX_IMAGE_BYTES: int = 10 * 1024 * 1024
+    MAX_MULTIPART_BODY_BYTES: int = MAX_IMAGE_BYTES + 64 * 1024
+    MAX_MULTIPART_FIELD_BYTES: int = 1024
+    MULTIPART_READ_TIMEOUT_SECONDS: float = 30.0
+    MAX_IMAGE_WIDTH: int = 4096
+    MAX_IMAGE_HEIGHT: int = 4096
+    MAX_IMAGE_PIXELS: int = 16_000_000
+    MAX_CONCURRENT_ANALYSES: int = 2
+    MAX_CONCURRENT_UPLOADS: int = 4
+    MAX_CONCURRENT_RECOMMENDATIONS: int = 4
+    MAX_RECOMMEND_BODY_BYTES: int = 4096
+    RECOMMEND_READ_TIMEOUT_SECONDS: float = 5.0
+    CORS_ORIGINS: tuple[str, ...] = _read_cors_origins()
 
 
 # 다른 파일에서 from config import settings 로 가져다 쓴다

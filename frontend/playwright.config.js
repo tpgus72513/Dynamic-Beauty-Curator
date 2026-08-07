@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import process from 'node:process'
 
 
 export default defineConfig({
@@ -8,7 +9,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: process.env.E2E_BASE_URL || 'http://127.0.0.1:5173',
     permissions: ['camera', 'geolocation'],
     geolocation: { latitude: 36.62, longitude: 127.29 },
     trace: 'retain-on-failure',

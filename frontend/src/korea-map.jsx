@@ -140,11 +140,11 @@ function colorForLevel(layer, level, selected) {
 }
 
 // ─── Map component ────────────────────────────────────────
-function KoreaMap({ activeLayer, selectedRegion, onSelectRegion, currentLocation, height = 400 }) {
+function KoreaMap({ activeLayer, selectedRegion, onSelectRegion, currentLocation, regionOverrides = {}, height = 400 }) {
   const layer = LAYERS[activeLayer];
   return (
     <svg viewBox="0 0 300 440" width="100%" height={height} preserveAspectRatio="xMidYMid meet"
-         style={{ display: 'block' }}>
+         role="img" aria-label="전국 환경 데모 지도" style={{ display: 'block' }}>
       <defs>
         <radialGradient id="bg-sea" cx="50%" cy="40%" r="80%">
           <stop offset="0%" stopColor="oklch(0.985 0.005 90)"/>
@@ -162,18 +162,29 @@ function KoreaMap({ activeLayer, selectedRegion, onSelectRegion, currentLocation
       {/* land regions — exact-share coords, no overlap, sharp miter joins */}
       <g>
         {KOREA_REGIONS.map(r => {
-          const v = layer.valueOf(r);
+          const interactive = typeof onSelectRegion === 'function';
+          const values = { ...r, ...(regionOverrides[r.id] || {}) };
+          const v = layer.valueOf(values);
           const lvl = layer.levelOf(v);
           const sel = selectedRegion === r.id;
           const fill = colorForLevel(layer, lvl, sel);
           return (
             <path key={r.id} d={r.path} fill={fill}
               shapeRendering="geometricPrecision"
+              role={interactive ? 'button' : undefined}
+              tabIndex={interactive ? 0 : undefined}
+              aria-label={interactive ? `${r.name} 데모 환경 선택` : undefined}
               style={{
-                cursor: 'pointer',
+                cursor: interactive ? 'pointer' : 'default',
                 transition: 'fill 320ms',
               }}
-              onClick={() => onSelectRegion?.(r.id)}/>
+              onClick={interactive ? () => onSelectRegion(r.id) : undefined}
+              onKeyDown={interactive ? (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelectRegion(r.id);
+                }
+              } : undefined}/>
           );
         })}
 

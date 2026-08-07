@@ -8,9 +8,17 @@
 # ============================================================
 
 import json
+import logging
 from config import settings
 from env_client import fetch_all_env, pm25_to_grade, uv_to_grade
 from fallback import get_fallback_env
+
+
+logger = logging.getLogger(__name__)
+
+
+class EnvironmentServiceError(RuntimeError):
+    """Raised without preserving external request URLs or API credentials."""
 
 
 # rules.json을 한 번만 읽어서 메모리에 보관
@@ -46,16 +54,18 @@ def get_env_data(lat: float, lng: float) -> tuple:
     try:
         # 먼저 진짜 외부 API 호출 시도
         env = fetch_all_env(lat, lng)
-        print(f"[recommender] 외부 API 호출 성공: {env['region']}")
+        logger.info("External environment API call succeeded")
         return env, False
 
-    except Exception as e:
+    except Exception as exc:
         # 실패하면 fallback으로 전환
-        print(f"[recommender] 외부 API 실패 ({e}) → fallback 사용")
+        logger.warning(
+            "External environment API failed; fallback policy applied (type=%s)",
+            type(exc).__name__,
+        )
 
         if not settings.USE_FALLBACK:
-            # fallback을 끈 경우엔 예외를 그대로 올림
-            raise
+            raise EnvironmentServiceError("Environment data is unavailable") from None
 
         # 좌표로는 행정동을 모르므로, 데모에서는 좌표를 행정동으로 역추정하거나
         # 가장 가까운 시드 지역을 쓴다. 여기서는 단순히 좌표 기반 추정 생략하고

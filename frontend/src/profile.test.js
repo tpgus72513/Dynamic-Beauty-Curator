@@ -19,6 +19,13 @@ describe('local nickname profile', () => {
     expect(() => normalizeNickname('1234567890123')).toThrow('12')
   })
 
+  it('ignores and removes an invalid nickname already stored on the device', () => {
+    localStorage.setItem('dbc.nickname', '1234567890123')
+
+    expect(readNickname()).toBe('')
+    expect(localStorage.getItem('dbc.nickname')).toBeNull()
+  })
+
   it('clears only the nickname key', () => {
     localStorage.setItem('unrelated', 'keep-me')
     saveNickname('민지')

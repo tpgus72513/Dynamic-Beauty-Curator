@@ -10,7 +10,14 @@ export function normalizeNickname(value) {
 
 
 export function readNickname(storage = localStorage) {
-  return storage.getItem(PROFILE_STORAGE_KEY)?.trim() || ''
+  const stored = storage.getItem(PROFILE_STORAGE_KEY)
+  if (stored == null) return ''
+  try {
+    return normalizeNickname(stored)
+  } catch {
+    storage.removeItem(PROFILE_STORAGE_KEY)
+    return ''
+  }
 }
 
 

@@ -1,29 +1,18 @@
-import asyncio
 from io import BytesIO
-from tempfile import SpooledTemporaryFile
 
 import pytest
-from fastapi import HTTPException, UploadFile
+from fastapi import HTTPException
 from PIL import Image
 
-from config import settings
 from image_upload import (
-    read_limited_upload,
     validate_content_type,
     validate_decodable_image,
 )
 
 
-def make_upload(data: bytes, filename: str = "face.jpg") -> UploadFile:
-    file = SpooledTemporaryFile()
-    file.write(data)
-    file.seek(0)
-    return UploadFile(file=file, filename=filename)
-
-
-def png_bytes() -> bytes:
+def png_bytes(size=(16, 16), mode="RGB") -> bytes:
     output = BytesIO()
-    Image.new("RGB", (16, 16), "peachpuff").save(output, format="PNG")
+    Image.new(mode, size).save(output, format="PNG")
     return output.getvalue()
 
 
@@ -50,27 +39,15 @@ def test_accepts_a_decodable_image():
     validate_decodable_image(png_bytes())
 
 
-def test_returns_exact_upload_bytes_below_limit():
-    upload = make_upload(b"small-image")
-
-    actual = asyncio.run(read_limited_upload(upload, settings.MAX_IMAGE_BYTES))
-
-    assert actual == b"small-image"
-
-
-def test_rejects_an_empty_upload():
-    upload = make_upload(b"")
-
+def test_rejects_image_width_over_safe_limit():
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(read_limited_upload(upload, settings.MAX_IMAGE_BYTES))
+        validate_decodable_image(png_bytes(size=(4097, 1), mode="1"))
 
-    assert exc.value.status_code == 400
+    assert exc.value.status_code == 413
 
 
-def test_rejects_an_upload_over_ten_megabytes():
-    upload = make_upload(b"x" * (settings.MAX_IMAGE_BYTES + 1))
-
+def test_rejects_image_total_pixels_over_safe_limit():
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(read_limited_upload(upload, settings.MAX_IMAGE_BYTES))
+        validate_decodable_image(png_bytes(size=(4001, 4000), mode="1"))
 
     assert exc.value.status_code == 413

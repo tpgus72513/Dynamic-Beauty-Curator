@@ -3,12 +3,12 @@
 import React from 'react';
 import { Button, BottomCTA, Card, Chip, NavTop, Placeholder, ScoreRing, SectionHead, StarRow, Toggle } from './ui';
 import {
-  IconArrowR, IconCheck, IconChevR, IconClose, IconDrop, IconDust, IconEdit, IconFace,
-  IconHeart, IconInfo, IconLeaf, IconLocation, IconShield, IconSparkle, IconSun, IconTemp,
+  IconArrowR, IconCheck, IconChevR, IconClose, IconDrop, IconDust, IconFace,
+  IconInfo, IconLeaf, IconLocation, IconShield, IconSparkle, IconSun, IconTemp,
 } from './icons';
 import {
   PRODUCTS, SKIN_TYPES,
-  HISTORY, TREND_OVERALL, TREND_HYDRATION, NOTIF_DEFAULTS,
+  NOTIF_DEFAULTS,
 } from './data';
 import { rankProducts } from './recommendation-ranking';
 // ═══════════════════════════════════════════════════════════
@@ -259,12 +259,18 @@ function ScreenResult({ ctx, nav }) {
 
         {/* env summary inline */}
         {env && <div style={{ padding: '24px 20px 0' }}>
-          <SectionHead title="오늘의 환경" sub={env.fullRegion} style={{ padding: 0, marginBottom: 12 }} />
+          <SectionHead
+            title="오늘의 환경"
+            sub={`${env.fullRegion} · ${env.source === 'live' ? '환경 API' : env.source === 'fallback' ? 'fallback' : '데모'}`}
+            style={{ padding: 0, marginBottom: 12 }}
+          />
           <Card padding={0}>
             <EnvRow icon={<IconDust size={16} />} label="미세먼지 (PM2.5)" value={`${env.pm25.value} ${env.pm25.unit}`} hint={env.pm25.label} level={env.pm25.level} />
             <EnvRow icon={<IconSun size={16} />} label="자외선 지수" value={env.uv.value} hint={env.uv.label} level={env.uv.level} />
-            <EnvRow icon={<IconDrop size={16} />} label="수질" value={env.water.label} hint="노후관 영향 지역" level={env.water.level} />
-            <EnvRow icon={<IconTemp size={16} />} label="기온·습도" value={`${env.temp.value}°C · ${env.humidity.value}%`} hint="실외 활동 보통" level="mid" last />
+            <EnvRow icon={<IconDrop size={16} />} label="수질" value={env.water.label} hint="지역 수질 지표" level={env.water.level} last={!env.temp || !env.humidity} />
+            {env.temp && env.humidity && (
+              <EnvRow icon={<IconTemp size={16} />} label="기온·습도" value={`${env.temp.value}°C · ${env.humidity.value}%`} hint="데모 참고값" level="mid" last />
+            )}
           </Card>
         </div>}
 
@@ -391,14 +397,35 @@ function ScreenRecommendations({ ctx, nav }) {
     return list;
   }, [sort, category, signals]);
 
+  if (!ctx.lastAnalysis) {
+    return (
+      <div className="screen anim-slide-r">
+        <NavTop onBack={() => nav.go('home')} title="오늘의 추천" />
+        <div className="screen-body" style={{ padding: '44px 20px 120px' }}>
+          <Card padding={24} style={{ textAlign: 'center', background: 'var(--accent-tint)' }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: 18, margin: '0 auto',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--accent-ink)', background: 'var(--bg-elev)',
+            }}><IconSparkle size={25} /></div>
+            <div className="h-sub" style={{ marginTop: 18 }}>피부 분석이 먼저 필요해요</div>
+            <p className="t-body" style={{ color: 'var(--ink-3)', margin: '8px 0 0' }}>
+              실제 5가지 피부 위험도를 분석한 뒤 맞춤 제품 순서를 보여드려요.
+            </p>
+          </Card>
+        </div>
+        <BottomCTA>
+          <Button onClick={() => nav.go('camera')} variant="primary" size="xl" fullWidth>
+            피부 분석 시작
+          </Button>
+        </BottomCTA>
+      </div>
+    );
+  }
+
   return (
     <div className="screen anim-slide-r">
-      <NavTop onBack={() => nav.go('result')} title="오늘의 추천" sub={`${SKIN_TYPES.find(t => t.id === ctx.skinProfile?.type)?.label || '건성·민감'} · ${ctx.env.region}`}
-        right={
-          <button style={{ width: 40, height: 40, background: 'transparent', border: 'none', color: 'var(--ink)' }}>
-            <IconHeart size={20} />
-          </button>
-        } />
+      <NavTop onBack={() => nav.go('result')} title="오늘의 추천" sub={`${SKIN_TYPES.find(t => t.id === ctx.skinProfile?.type)?.label || '건성·민감'} · ${ctx.env.region}`} />
 
       <div className="screen-body">
         {/* curation banner */}
@@ -549,16 +576,75 @@ function MatchBadge({ value }) {
 }
 
 function ProductSheet({ p, onClose }) {
+  const dialogRef = React.useRef(null);
+  const titleId = React.useId();
   const reasons = p.personalizedReason
     ? [`${p.personalizedReason.reason} · ${p.personalizedReason.label} 매칭`, ...p.why]
     : p.why;
+
+  React.useEffect(() => {
+    const returnFocus = document.activeElement;
+    const dialog = dialogRef.current;
+    const focusableSelector = [
+      'button:not([disabled])',
+      '[href]',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(',');
+
+    dialog?.focus({ preventScroll: true });
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialog) return;
+
+      const focusable = [...dialog.querySelectorAll(focusableSelector)];
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || active === dialog || !dialog.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || active === dialog || !dialog.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (returnFocus instanceof HTMLElement) returnFocus.focus({ preventScroll: true });
+    };
+  }, [onClose]);
+
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 50,
       background: 'rgba(0,0,0,0.4)',
       display: 'flex', alignItems: 'flex-end',
     }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="anim-fade" style={{
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onClick={e => e.stopPropagation()}
+        className="anim-fade"
+        style={{
         width: '100%',
         maxHeight: '88%',
         background: 'var(--bg)',
@@ -566,7 +652,8 @@ function ProductSheet({ p, onClose }) {
         overflow: 'auto',
         boxShadow: 'var(--shadow-up)',
         animation: 'slideInRight 280ms cubic-bezier(0.22,1,0.36,1)',
-      }}>
+        }}
+      >
         <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
           <div style={{ width: 36, height: 4, borderRadius: 9999, background: 'var(--line-2)' }} />
         </div>
@@ -575,7 +662,7 @@ function ProductSheet({ p, onClose }) {
             <Placeholder width={120} height={120} radius={14} label="product" hue={p.category === '진정·보습' ? 150 : 30} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', letterSpacing: '0.05em', fontFamily: 'var(--font-mono)' }}>{p.brand}</div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)', marginTop: 4, letterSpacing: '-0.02em', lineHeight: 1.25 }}>{p.name}</div>
+              <div id={titleId} style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)', marginTop: 4, letterSpacing: '-0.02em', lineHeight: 1.25 }}>{p.name}</div>
               <div style={{ marginTop: 8 }}><StarRow value={p.rating} count={p.reviewCount} /></div>
               <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 {p.originalPrice && (
@@ -640,11 +727,8 @@ function ProductSheet({ p, onClose }) {
             </div>
           </div>
 
-          <div style={{ marginTop: 24, display: 'flex', gap: 8 }}>
-            <Button onClick={onClose} variant="outline" size="lg" style={{ flex: 1 }}>닫기</Button>
-            <Button variant="primary" size="lg" style={{ flex: 2 }} iconRight={<IconArrowR size={16} />}>
-              상세 보기
-            </Button>
+          <div style={{ marginTop: 24 }}>
+            <Button onClick={onClose} variant="outline" size="lg" fullWidth>닫기</Button>
           </div>
         </div>
       </div>
@@ -653,148 +737,83 @@ function ProductSheet({ p, onClose }) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// 8. HISTORY — timeline + trend
+// 8. HISTORY — current-session result only
 // ═══════════════════════════════════════════════════════════
 function ScreenHistory({ ctx, nav }) {
+  const analysis = ctx.lastAnalysis;
+
+  if (!analysis) {
+    return (
+      <div className="screen anim-slide-r">
+        <NavTop onBack={() => nav.go('home')} title="분석 기록" />
+        <div className="screen-body" style={{ padding: '44px 20px 120px' }}>
+          <Card padding={24} style={{ textAlign: 'center', background: 'var(--accent-tint)' }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: 18, margin: '0 auto',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--accent-ink)', background: 'var(--bg-elev)',
+            }}><IconFace size={25} /></div>
+            <div className="h-sub" style={{ marginTop: 18 }}>저장된 분석 기록이 없어요</div>
+            <p className="t-body" style={{ color: 'var(--ink-3)', margin: '8px 0 20px' }}>
+              분석 결과는 현재 세션에서만 확인할 수 있고, 사진과 결과를 기기에 영구 저장하지 않아요.
+            </p>
+            <Button onClick={() => nav.go('camera')} variant="primary" fullWidth>
+              피부 분석 시작
+            </Button>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const date = new Date(analysis.analyzedAt);
+  const analyzedAt = Number.isNaN(date.getTime())
+    ? '방금 완료'
+    : new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+  const focusRisks = analysis.focusRisks?.length
+    ? analysis.focusRisks.slice(0, 2)
+    : analysis.mainRisk ? [analysis.mainRisk] : [];
+
   return (
     <div className="screen anim-slide-r">
-      <NavTop onBack={() => nav.go('home')} title="분석 히스토리" />
-      <div className="screen-body">
-        {/* trend chart */}
-        <div style={{ padding: '4px 20px 0' }}>
-          <Card padding={18}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <div>
-                <div className="t-small" style={{ color: 'var(--ink-3)' }}>최근 7회 추이</div>
-                <div className="h-sub" style={{ marginTop: 2 }}>피부 점수</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.03em', lineHeight: 1 }}>72</div>
-                <div style={{ fontSize: 11, color: 'var(--status-vbad)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>-4 ↓</div>
-              </div>
-            </div>
-            <div style={{ marginTop: 14 }}>
-              <TrendChart data={TREND_OVERALL} height={100} color="var(--accent-strong)" />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-              {['7일전', '6일전', '5일전', '4일전', '3일전', '어제', '오늘'].map((d, i) => (
-                <span key={i} style={{ fontSize: 9, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{d}</span>
+      <NavTop onBack={() => nav.go('home')} title="분석 기록" />
+      <div className="screen-body" style={{ padding: '4px 20px 28px' }}>
+        <Card padding={18}>
+          <div className="t-small" style={{ color: 'var(--accent-ink)', fontWeight: 700 }}>현재 세션 결과</div>
+          <div className="h-sub" style={{ marginTop: 4 }}>{analyzedAt}</div>
+          <div className="t-tiny" style={{ marginTop: 4, color: 'var(--ink-3)' }}>기기에 영구 저장되지 않음</div>
+
+          {focusRisks.length > 0 && (
+            <ul aria-label="현재 세션 우선 관리 위험도" style={{ listStyle: 'none', padding: 0, margin: '18px 0 0', display: 'grid', gap: 8 }}>
+              {focusRisks.map(risk => (
+                <li key={risk.id} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '10px 12px', borderRadius: 12, background: 'var(--bg-sunken)',
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{risk.label_ko}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent-ink)', fontFamily: 'var(--font-mono)' }}>
+                    {risk.risk_score}
+                  </span>
+                </li>
               ))}
-            </div>
-          </Card>
-        </div>
+            </ul>
+          )}
 
-        {/* hydration mini */}
-        <div style={{ padding: '12px 20px 0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <Card padding={14}>
-            <div className="t-small" style={{ fontSize: 11 }}>수분 추이</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 4 }}>
-              <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink)' }}>48</span>
-              <span style={{ fontSize: 11, color: 'var(--status-vbad)', fontFamily: 'var(--font-mono)' }}>-4</span>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <TrendChart data={TREND_HYDRATION} height={32} color="oklch(0.65 0.10 220)" mini />
-            </div>
-          </Card>
-          <Card padding={14}>
-            <div className="t-small" style={{ fontSize: 11 }}>이번 주 분석</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 4 }}>
-              <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink)' }}>3</span>
-              <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>회</span>
-            </div>
-            <div className="t-tiny" style={{ marginTop: 4, color: 'var(--ink-3)' }}>주 5회 권장</div>
-          </Card>
-        </div>
+          <Button onClick={() => nav.go('result')} variant="outline" fullWidth style={{ marginTop: 18 }}>
+            결과 다시 보기
+          </Button>
+        </Card>
 
-        {/* timeline */}
-        <div style={{ padding: '24px 20px 0' }}>
-          <SectionHead title="전체 기록" sub={`${HISTORY.length}건`} style={{ padding: 0, marginBottom: 12 }} />
-          <div style={{ position: 'relative', paddingLeft: 18 }}>
-            <div style={{
-              position: 'absolute', left: 5, top: 6, bottom: 6,
-              width: 1, background: 'var(--line-2)',
-            }} />
-            {HISTORY.map((h, i) => (
-              <div key={h.date} style={{ position: 'relative', paddingBottom: 14 }}>
-                <div style={{
-                  position: 'absolute', left: -18, top: 18,
-                  width: 11, height: 11, borderRadius: 9999,
-                  background: i === 0 ? 'var(--accent-strong)' : '#fff',
-                  border: i === 0 ? '2px solid #fff' : '2px solid var(--line-2)',
-                  boxShadow: i === 0 ? '0 0 0 2px var(--accent-strong)' : 'none',
-                }} />
-                <Card padding={14}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{h.day}</span>
-                        <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{h.date}</span>
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{h.region}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)', lineHeight: 1 }}>{h.overall}</div>
-                      <div style={{ fontSize: 9, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>SCORE</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-                    <MiniStat icon={<IconDust size={11} />} value={`PM ${h.pm25}`} />
-                    <MiniStat icon={<IconSun size={11} />} value={`UVI ${h.uv}`} />
-                    <MiniStat icon={<IconSparkle size={11} />} value={h.top} />
-                  </div>
-                </Card>
-              </div>
-            ))}
+        <Card padding={14} style={{ marginTop: 12, background: 'var(--bg-sunken)' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <IconShield size={16} />
+            <p className="t-small" style={{ color: 'var(--ink-3)', margin: 0, lineHeight: 1.5 }}>
+              현재 버전은 분석 이력을 저장하지 않습니다. 새로고침하거나 로그아웃하면 이 결과도 사라져요.
+            </p>
           </div>
-        </div>
-        <div style={{ height: 24 }} />
+        </Card>
       </div>
     </div>
-  );
-}
-
-function MiniStat({ icon, value }) {
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      padding: '3px 8px', borderRadius: 9999,
-      background: 'var(--bg-sunken)',
-      fontSize: 10, fontWeight: 600, color: 'var(--ink-2)',
-      fontFamily: 'var(--font-mono)',
-    }}>
-      {icon}{value}
-    </span>
-  );
-}
-
-function TrendChart({ data, height = 80, color, mini }) {
-  const max = Math.max(...data) + 5;
-  const min = Math.min(...data) - 5;
-  const w = 320;
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = height - ((v - min) / (max - min)) * height;
-    return [x, y];
-  });
-  const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ');
-  const areaPath = `${path} L ${w} ${height} L 0 ${height} Z`;
-  const id = React.useMemo(() => `g-${Math.random().toString(36).slice(2, 8)}`, []);
-  return (
-    <svg width="100%" height={height} viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none">
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.18" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={areaPath} fill={`url(#${id})`} />
-      <path d={path} fill="none" stroke={color} strokeWidth={mini ? 1.6 : 2} strokeLinecap="round" strokeLinejoin="round" />
-      {!mini && pts.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={i === pts.length - 1 ? 4 : 2.5}
-          fill={i === pts.length - 1 ? color : '#fff'}
-          stroke={color} strokeWidth="1.5" />
-      ))}
-    </svg>
   );
 }
 
@@ -807,6 +826,7 @@ function ScreenMyPage({ ctx, nav }) {
 
   const skinLabel = SKIN_TYPES.find(t => t.id === ctx.skinProfile?.type)?.label || '미설정';
   const nickname = ctx.user?.nickname || '고객';
+  const hasCurrentAnalysis = Boolean(ctx.lastAnalysis);
 
   return (
     <div className="screen anim-slide-r">
@@ -828,16 +848,11 @@ function ScreenMyPage({ ctx, nav }) {
                 <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{nickname}</div>
                 <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>이 기기에 저장된 로컬 프로필</div>
               </div>
-              <button style={{
-                width: 36, height: 36, borderRadius: 9999, background: 'var(--bg-sunken)',
-                border: 'none', color: 'var(--ink-2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}><IconEdit size={16} /></button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 16 }}>
-              <ProfileStat label="총 분석" value="42회" />
-              <ProfileStat label="평균 점수" value="74" />
-              <ProfileStat label="저장 제품" value="18" />
+              <ProfileStat label="이번 세션 분석" value={hasCurrentAnalysis ? '1회' : '0회'} />
+              <ProfileStat label="최근 결과" value={hasCurrentAnalysis ? '있음' : '없음'} />
+              <ProfileStat label="저장 제품" value="0개" />
             </div>
           </Card>
         </div>
@@ -848,7 +863,7 @@ function ScreenMyPage({ ctx, nav }) {
           <Card padding={0}>
             <SettingRow icon={<IconFace size={16} />} label="피부 타입" value={skinLabel} onClick={() => nav.go('skin-setup')} />
             <SettingRow icon={<IconSparkle size={16} />} label="관심 고민" value={`${ctx.skinProfile?.concerns?.length || 0}개`} onClick={() => nav.go('skin-setup')} />
-            <SettingRow icon={<IconLocation size={16} />} label="기본 위치" value={ctx.env.fullRegion} onClick={() => { }} last />
+            <SettingRow icon={<IconLocation size={16} />} label="기본 위치" value={ctx.env.fullRegion} chev={false} last />
           </Card>
         </div>
 
@@ -866,7 +881,7 @@ function ScreenMyPage({ ctx, nav }) {
                   <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{n.label}</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3, lineHeight: 1.4 }}>{n.desc}</div>
                 </div>
-                <Toggle value={n.value} onChange={v => setNotif(n.id, v)} />
+                <Toggle value={n.value} onChange={v => setNotif(n.id, v)} label={n.label} />
               </div>
             ))}
           </Card>
@@ -876,7 +891,7 @@ function ScreenMyPage({ ctx, nav }) {
         <SectionHead title="계정" style={{ padding: '24px 20px 12px', margin: 0 }} />
         <div style={{ padding: '0 20px' }}>
           <Card padding={0}>
-            <SettingRow icon={<IconShield size={16} />} label="개인정보 및 데이터" onClick={() => { }} />
+            <SettingRow icon={<IconShield size={16} />} label="개인정보 및 데이터" value="사진 미저장" chev={false} />
             <SettingRow icon={<IconInfo size={16} />} label="버전 정보" value="0.4.1 · beta" chev={false} />
             <SettingRow icon={<IconClose size={16} />} label="로그아웃" onClick={ctx.logout} danger last />
           </Card>
@@ -899,14 +914,15 @@ function ProfileStat({ label, value }) {
 }
 
 function SettingRow({ icon, label, value, onClick, chev = true, last, danger }) {
-  return (
-    <button onClick={onClick} style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '14px 16px', width: '100%',
-      background: 'transparent', border: 'none', textAlign: 'left',
-      cursor: onClick ? 'pointer' : 'default',
-      borderBottom: last ? 'none' : '1px solid var(--line)',
-    }}>
+  const rowStyle = {
+    display: 'flex', alignItems: 'center', gap: 12,
+    padding: '14px 16px', width: '100%',
+    background: 'transparent', border: 'none', textAlign: 'left',
+    cursor: onClick ? 'pointer' : 'default',
+    borderBottom: last ? 'none' : '1px solid var(--line)',
+  };
+  const content = (
+    <>
       <div style={{
         width: 32, height: 32, borderRadius: 10,
         background: 'var(--bg-sunken)',
@@ -916,8 +932,11 @@ function SettingRow({ icon, label, value, onClick, chev = true, last, danger }) 
       <div style={{ flex: 1, fontSize: 14, color: danger ? 'var(--status-vbad)' : 'var(--ink)', fontWeight: 500 }}>{label}</div>
       {value && <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>{value}</div>}
       {chev && onClick && <IconChevR size={16} stroke="var(--ink-4)" />}
-    </button>
+    </>
   );
+
+  if (!onClick) return <div style={rowStyle}>{content}</div>;
+  return <button type="button" onClick={onClick} style={rowStyle}>{content}</button>;
 }
 
 export {

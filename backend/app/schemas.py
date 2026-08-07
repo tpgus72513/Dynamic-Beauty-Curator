@@ -11,7 +11,7 @@
 from datetime import datetime
 from typing import Dict, List
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ------------------------------------------------------------
@@ -20,13 +20,39 @@ from pydantic import BaseModel, Field
 class RecommendRequest(BaseModel):
     """POST /recommend 로 들어오는 요청 본문"""
 
-    lat: float = Field(..., description="위도 (예: 36.62)", example=36.62)
-    lng: float = Field(..., description="경도 (예: 127.29)", example=127.29)
+    model_config = ConfigDict(extra="forbid")
+
+    lat: float = Field(
+        ...,
+        ge=-90,
+        le=90,
+        allow_inf_nan=False,
+        description="위도 (예: 36.62)",
+        example=36.62,
+    )
+    lng: float = Field(
+        ...,
+        ge=-180,
+        le=180,
+        allow_inf_nan=False,
+        description="경도 (예: 127.29)",
+        example=127.29,
+    )
     skin_type: str = Field(
         ...,
+        min_length=1,
+        max_length=64,
         description="피부 타입. dry / oily / combination / sensitive 중 하나",
         example="dry_sensitive",
     )
+
+    @field_validator("skin_type")
+    @classmethod
+    def normalize_skin_type(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("skin_type must not be blank")
+        return normalized
 
 
 # ------------------------------------------------------------

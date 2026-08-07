@@ -61,9 +61,18 @@ function Button({ children, onClick, type = 'button', variant = 'primary', size 
 
 // ─── Card ──────────────────────────────────────────────────
 function Card({ children, style, padding = 16, onClick, selected, interactive }) {
+  const handleKeyDown = (event) => {
+    if (!onClick || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    onClick(event);
+  };
   return (
     <div
       onClick={onClick}
+      onKeyDown={handleKeyDown}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-pressed={onClick && typeof selected === 'boolean' ? selected : undefined}
       style={{
         background: 'var(--bg-elev)',
         borderRadius: 'var(--r-lg)',
@@ -84,7 +93,9 @@ function Chip({ children, selected, onClick, size = 'md', icon }) {
   const s = sizes[size];
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-pressed={selected}
       style={{
         height: s.h,
         padding: `0 ${s.px}px`,
@@ -166,9 +177,13 @@ function ProgressDots({ count, current }) {
 }
 
 // ─── Toggle ───────────────────────────────────────────────
-function Toggle({ value, onChange }) {
+function Toggle({ value, onChange, label = '설정 전환' }) {
   return (
     <button
+      type="button"
+      role="switch"
+      aria-checked={value}
+      aria-label={label}
       onClick={() => onChange(!value)}
       style={{
         width: 50, height: 30, borderRadius: 9999,

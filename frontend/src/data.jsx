@@ -24,6 +24,7 @@ const CONCERNS = [
 
 // ─── environmental data (mock for 조치원읍 demo) ───────────
 const ENV_DATA = {
+  source: 'demo',
   region: '조치원읍',
   fullRegion: '세종시 조치원읍',
   updatedAt: '오전 7:32',

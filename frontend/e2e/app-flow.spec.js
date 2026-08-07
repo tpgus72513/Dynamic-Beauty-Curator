@@ -25,7 +25,26 @@ test('nickname, camera analysis, recommendation, and logout flow', async ({ page
       Boolean(video.srcObject) && video.videoWidth > 0 && video.videoHeight > 0
     )),
   ).toBe(true)
+  const analyzeResponsePromise = page.waitForResponse(response => (
+    response.url().endsWith('/api/analyze')
+    && response.request().method() === 'POST'
+  ))
   await page.getByRole('button', { name: '얼굴 사진 촬영' }).click()
+
+  const analyzeResponse = await analyzeResponsePromise
+  expect(analyzeResponse.status()).toBe(200)
+  const analyzeBody = await analyzeResponse.json()
+  expect(analyzeBody.model).toEqual({
+    name: 'efficientnetb2_skin_multitask',
+    version: 'e835bb5686ff',
+  })
+  expect(Object.keys(analyzeBody.skin_analysis)).toEqual([
+    'pigmentation',
+    'dryness',
+    'pore',
+    'wrinkle',
+    'sensitivity',
+  ])
 
   await expect(page.getByText('분석 결과', { exact: true })).toBeVisible({ timeout: 90_000 })
   const riskList = page.getByRole('list', { name: '5가지 피부 위험도' })

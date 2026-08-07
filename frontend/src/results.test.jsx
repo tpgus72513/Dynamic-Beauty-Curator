@@ -2,7 +2,12 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 
 import { ENV_DATA } from './data'
-import { ScreenRecommendations, ScreenResult } from './screens-5-9'
+import {
+  ScreenHistory,
+  ScreenMyPage,
+  ScreenRecommendations,
+  ScreenResult,
+} from './screens-5-9'
 
 
 const factors = [
@@ -60,6 +65,22 @@ it('offers a camera recovery route instead of mock results when no analysis exis
 })
 
 
+it('requires a real analysis before claiming personalized product ranking', () => {
+  const go = vi.fn()
+  render(<ScreenRecommendations ctx={{
+    env: ENV_DATA,
+    skinProfile: { type: 'dry_sensitive' },
+    lastAnalysis: null,
+    recommend: { recommendations: [], ranking_signals: [] },
+  }} nav={{ go }} />)
+
+  expect(screen.getByText('피부 분석이 먼저 필요해요')).toBeVisible()
+  expect(screen.queryByText('실제 피부 위험도')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '피부 분석 시작' }))
+  expect(go).toHaveBeenCalledWith('camera')
+})
+
+
 it('changes the first recommended product when risk ranking signals change', () => {
   const ctx = resultContext()
   ctx.recommend.ranking_signals = [
@@ -83,4 +104,58 @@ it('changes the first recommended product when risk ranking signals change', () 
 
   list = screen.getByRole('list', { name: '맞춤 추천 제품' })
   expect(within(within(list).getAllByRole('listitem')[0]).getByText('데일리 인비저블 선젤 SPF50+')).toBeVisible()
+})
+
+
+it('opens product details as an accessible modal and restores focus when closed', () => {
+  render(<ScreenRecommendations ctx={resultContext()} nav={{ go: vi.fn() }} />)
+
+  const productList = screen.getByRole('list', { name: '맞춤 추천 제품' })
+  const opener = within(within(productList).getAllByRole('listitem')[0]).getByRole('button')
+  opener.focus()
+  fireEvent.click(opener)
+
+  const dialog = screen.getByRole('dialog', { name: '시카 진정 크림 50ml' })
+  expect(dialog).toHaveAttribute('aria-modal', 'true')
+  expect(dialog).toHaveFocus()
+  expect(within(dialog).queryByRole('button', { name: '상세 보기' })).not.toBeInTheDocument()
+
+  fireEvent.keyDown(document, { key: 'Tab' })
+  expect(within(dialog).getByRole('button', { name: '닫기' })).toHaveFocus()
+
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(opener).toHaveFocus()
+})
+
+
+it('shows an honest empty history for a profile with no analysis', () => {
+  const go = vi.fn()
+  render(<ScreenHistory ctx={{ lastAnalysis: null }} nav={{ go }} />)
+
+  expect(screen.getByText('저장된 분석 기록이 없어요')).toBeVisible()
+  expect(screen.queryByText('최근 7회 추이')).not.toBeInTheDocument()
+  expect(screen.queryByText('42회')).not.toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: '피부 분석 시작' }))
+  expect(go).toHaveBeenCalledWith('camera')
+})
+
+
+it('does not present demo profile totals as real user data', () => {
+  render(<ScreenMyPage ctx={{
+    user: { nickname: '새사용자' },
+    env: ENV_DATA,
+    skinProfile: null,
+    lastAnalysis: null,
+  }} nav={{ go: vi.fn() }} />)
+
+  expect(screen.getByText('새사용자')).toBeVisible()
+  expect(screen.getByText('이번 세션 분석')).toBeVisible()
+  expect(screen.getByText('최근 결과')).toBeVisible()
+  expect(screen.getByText('0회')).toBeVisible()
+  expect(screen.getByText('없음')).toBeVisible()
+  expect(screen.queryByText('42회')).not.toBeInTheDocument()
+  expect(screen.queryByText('74')).not.toBeInTheDocument()
+  expect(screen.queryByText('18')).not.toBeInTheDocument()
 })
