@@ -138,6 +138,19 @@ def health_check():
     }
 
 
+@app.get("/health")
+def readiness_check():
+    """Report whether this instance can serve model-backed analysis traffic."""
+    status = model_status()
+    payload = {
+        "status": "ready" if status["ready"] else "unavailable",
+        "model": status,
+    }
+    if not status["ready"]:
+        return JSONResponse(status_code=503, content=payload)
+    return payload
+
+
 def assemble_analyze_response(analysis: dict, recommendation: dict) -> dict:
     status = model_status()
     return {

@@ -131,6 +131,53 @@ def test_health_reports_model_state(monkeypatch):
     assert response.json()["model"]["ready"] is False
 
 
+def test_readiness_is_healthy_only_when_model_is_ready(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "model_status",
+        lambda: {
+            "ready": True,
+            "name": "efficientnetb2_skin_multitask",
+            "version": "e835bb5686ff",
+            "error": None,
+        },
+        raising=False,
+    )
+
+    response = TestClient(main.app).get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ready",
+        "model": {
+            "ready": True,
+            "name": "efficientnetb2_skin_multitask",
+            "version": "e835bb5686ff",
+            "error": None,
+        },
+    }
+
+
+def test_readiness_rejects_traffic_when_model_is_unavailable(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "model_status",
+        lambda: {
+            "ready": False,
+            "name": "efficientnetb2_skin_multitask",
+            "version": "e835bb5686ff",
+            "error": "model_unavailable",
+        },
+        raising=False,
+    )
+
+    response = TestClient(main.app).get("/health")
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "unavailable"
+    assert response.json()["model"]["error"] == "model_unavailable"
+
+
 def test_analyze_rejects_pdf_before_inference():
     response = post_analysis(
         TestClient(main.app),
